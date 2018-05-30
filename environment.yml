@@ -1,0 +1,9 @@
+name: ocrtools_test
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - basemap
+  - matplotlib
+  - netcdf4
+  - numpy
