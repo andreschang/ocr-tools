@@ -19,27 +19,42 @@ scratchId = now.strftime("%Y%m%d%H%M")
 
 class query(object):
 
-  def __init__(self, stage = None, verbose = True):
+  def __init__(self, stage = None, verbose = True, **kwargs):
 
+    self.verbose = verbose
+    try:
+      self.file = [kwargs["file"]]
+    except:
+      pass
+    try:
+      self.src = kwargs["src"]
+    except:
+      pass
     try:
       self.directories = stage.directories
-      self.subfolders = stage.subfolders
-      self.naming = stage.naming
-      self.time_as = stage.time_as
-      self.base_yr = stage.base_yr
     except:
-      self.directories = None
-      self.subfolders = None
+      self.directories = {"cesm-raw": "", "cesm-reformatted" : "", "other-reformatted": "", \
+      "scratch": "", "plot": "", "csv": ""}
+    try:
+      self.subfolders = stage.subfolders
+    except:
+      self.subfolders = {"cesm-raw": "", "cesm-reformatted" : "", "other-reformatted": "", \
+      "scratch": "", "plot": "", "csv": ""}
+    try:
+      self.naming = stage.naming
+    except:
       self.naming = {"cesm-reformatted": ["var_name", "dt", "cesm_mem", "time_slice"], \
     "other-reformatted": ["var_name", "dt", "time_slice"], "spatial-average": ["var_name", \
     "dt", "yr_range", "mean", "scratchId"], "cesm-report": ["var_name", "dt", "cesm_mem"], \
     "other-report": ["var_name", "dt"]}
-      self.time_as = 'sequence'
-      self.base_yr = 1920
     try:
-      self.verbose = verbose
+      self.time_as = stage.time_as
     except:
-      self.verbose = True
+      self.time_as = "date"
+    try:
+      self.base_yr = stage.base_yr
+    except:
+      self.base_yr = 1920
 
   ## Primary functions  ##
   ########################
@@ -163,13 +178,18 @@ class query(object):
       total_area = 0.
       sum_var = 0.
       for i in range(len(lat_indices)):
-        if np.isnan(ts_var[0, lat_indices[i], lon_indices[i]]) == False:
+        if (np.isnan(ts_var[0, lat_indices[i], lon_indices[i]]) == False and \
+          ts_var[0, lat_indices[i], lon_indices[i]]) < 3e10:
           sum_var += ts_var[:, lat_indices[i], lon_indices[i]]*self.cellarea0[lat_indices[i], lon_indices[i]]
           total_area += self.cellarea0[lat_indices[i], lon_indices[i]]
+      print(sum_var)
+      print(total_area)
       mvar0 = sum_var/total_area
+      print(mvar0)
 
-    mvar += list(mvar0)
-    xtime = np.arange(0, (self.ndiv)*(self.yrf-self.yr0+1))
+    roundEnd = (self.yrf-self.yr0+1)*self.ndiv
+    mvar += list(mvar0)[:roundEnd]
+    xtime = np.arange(self.yr0, self.yrf+1, 1./self.ndiv)
 
     if output == 'plot':
       import matplotlib.pyplot as plt
@@ -190,22 +210,37 @@ class query(object):
     elif output == 'list':
       return mvar
 
-  def set_params(self, file = '', src = 'unknown', **kwargs):
+  def set_params(self, src = 'unknown', **kwargs):
     ## 'interactive' mode opens up the file, prompting the user to
     ## set each param. 'cesm' mode sets up the file automatically
+
+    try:
+      src = self.src
+    except:
+      pass
 
     if src == 'unknown':
 
       self.src = 'unknown'
-      self.file = [file]
+      try:
+        self.file
+      except AttributeError:
+        try:
+          self.file = [kwargs["file"]]
+        except KeyError:
+          self.file = [input('Enter file: ')]
+
 
       try:
-        self.var_name = kwargs["var"]
-        self.f_open = Dataset(file)
-        self.fvars = self.f_open.variables
-      except KeyError:        
-        self.first_look(file)
-        self.var_name = input('Enter main variable: ')
+        self.var_name
+      except AttributeError:
+        try:
+          self.var_name = kwargs["var"]
+          self.f_open = Dataset(self.file[0])
+          self.fvars = self.f_open.variables
+        except KeyError:        
+          self.first_look()
+          self.var_name = input('Enter main variable: ')
 
       self.src_var_name = self.var_name
       fdim = list(self.fvars[self.var_name].dimensions)
@@ -320,7 +355,7 @@ class query(object):
             print("Showing first values in time variable...\n")
             print(self.fvars[self.time_name][0:4])
 
-          data_yr0 = input('Enter data yr0: ')
+          data_yr0 = int(input('Enter data yr0: '))
         self.data_yr0 = [data_yr0]
 
       ## SET DT
@@ -376,6 +411,7 @@ class query(object):
 
     elif src == 'cesm':
       self.src = 'cesm'
+      print("")
       try:
         self.var_name = kwargs["var"]
       except KeyError:
@@ -418,13 +454,32 @@ class query(object):
       self.fname = self.fill_cesm_params()
       self.f_open = None
 
-  def first_look(self, file):
-    self.f_open = Dataset(file)
-    # self.fkeys = f_open.variables.keys()
+  def first_look(self, **kwargs):
+    try:
+      self.f_open
+    except:
+      try:
+        self.file
+      except:
+        try:
+          self.file = [kwargs["file"]]
+        except:
+          self.file = [input('Enter file: ')]
+
+      self.f_open = Dataset(self.file[0])
+
     self.fvars = self.f_open.variables
-    print("\nShowing variables ...\n")
-    print(', '.join(self.f_open.variables.keys())+'\n')
-    # f_open.close()
+
+    try:
+      var_look = kwargs["var"]
+      try:
+        print("Showing metadata for variable, "+kwargs["var"]+"\n")
+        print(self.f_open.variables[var_look])
+      except:
+        print("Variable not in file")
+    except:
+      print("\nShowing variables ...\n")
+      print(', '.join(self.f_open.variables.keys())+'\n')
 
 
   ## Core data-wrangling utilities ##
@@ -445,7 +500,7 @@ class query(object):
       print(ff)
       print('concatenating')
       add_f_open = Dataset(self.file[ff])
-      self.var = np.concatenate((self.var, add_f_open.variables[self.src_var_name][:]), axis = self.axes[self.time_name])
+      self.var = np.concatenate((self.var, add_f_open.variables[self.src_var_name][:]), axis = self.axes['time'])
       add_f_open.close()
 
     print(self.var.shape)
@@ -572,16 +627,16 @@ class query(object):
     ## returns var, an ordered list of dimensions,
     ## and axis of each independent variable
 
-    if self.axes[self.time_name] > 0:
-      varF = np.moveaxis(self.var, self.axes[self.time_name], 0)
+    if self.axes['time'] > 0:
+      varF = np.moveaxis(self.var, self.axes['time'], 0)
       self.dim.remove(self.time_name)
       dimF = [self.time_name]+self.dim
-    elif self.axes[self.time_name] == 0:
+    elif self.axes['time'] == 0:
       varF = self.var
       dimF = self.dim
 
-    self.axes[self.time_name] = dimF.index(self.time_name)
-    self.axes[self.lat_name], self.axes[self.lon_name] = dimF.index(self.lat_name), dimF.index(self.lon_name)
+    self.axes['time'] = dimF.index('time')
+    self.axes['lat'], self.axes['lon'] = dimF.index('lat'), dimF.index('lon')
 
     if len(self.dim) > 3:
       self.axes['level'] = dimF.index('level')
@@ -589,13 +644,13 @@ class query(object):
       self.axes['level'] = False
 
   def make_curv_grid(self):
-    ni = self.lat.shape[0]
-    nj = self.lat.shape[1]
+    ni = self.lat0.shape[0]
+    nj = self.lat0.shape[1]
     curv_grid = np.zeros((ni, nj, 2))
 
     for i in range(ni):
       for j in range(nj):
-        curv_grid[i,j] = [self.lat[i, j], self.lon[i,j]]
+        curv_grid[i,j] = [self.lat0[i, j], self.lon0[i,j]]
 
     return curv_grid
 
@@ -607,6 +662,7 @@ class query(object):
         self.yr0 = kwargs0['yr0']
       except KeyError:
         self.yr0 = self.data_yr0[0]
+        print(self.yr0)
     try:
       self.yrf
     except AttributeError:
@@ -621,15 +677,16 @@ class query(object):
       self.extract_data()
 
     self.ndiv = ndivs[self.dt]
+    print(self.yr0)
+    print(self.data_yr0)
     offset = (self.yr0-self.data_yr0[0])*self.ndiv
-    print('offset')
-    print(offset)
     try:
       self.nt = (self.yrf-self.yr0+1)*self.ndiv
     except TypeError:
       self.nt = ((self.var.shape[0]-(self.yr0-self.data_yr0[0])*self.ndiv)-1)
-      self.yrf = self.yr0+int(self.nt/self.ndiv)
+      self.yrf = self.yr0-1+int(self.nt/self.ndiv)
 
+    print(self.yrf)
     try:
       return self.var[offset:], offset
     except:
@@ -663,6 +720,7 @@ class query(object):
         self.cesm_grid, self.cesm_model = 'cice', 'ice'
         self.lon_name = 'TLON'
         self.lat_name = 'TLAT'
+        self.cellarea_name = 'tarea'
         f_hem = "_"+self.cesm_hemisphere
         if self.dt == 'daily':
           self.src_var_name = self.var_name+'_d'
