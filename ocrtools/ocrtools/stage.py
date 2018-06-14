@@ -41,6 +41,8 @@ class stage(object):
       "scratch": []}
       import matplotlib
       matplotlib.use('Agg')
+    elif preset == 'demo':
+      
     self.naming = {"cesm-reformatted": ["var_name", "dt", "cesm_mem", "time_slice"], \
     "other-reformatted": ["var_name", "dt", "time_slice"], "spatial_average": ["var_name", \
     "dt", "time_slice", "mean", "scratchId"], "cesm_report": ["var_name", "dt", "cesm_mem"], \
