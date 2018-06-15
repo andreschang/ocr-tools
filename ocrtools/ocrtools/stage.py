@@ -10,7 +10,7 @@ from netCDF4 import Dataset, num2date
 
 ## Global variables
 
-version = "4.1"
+version = "4.2"
 ndivs = {'daily': 365, 'monthly':12}
 cice_vars = ['aice', 'hi', 'flwdn', 'fswdn']
 cam_vars = ['TS', 'PRECT']
