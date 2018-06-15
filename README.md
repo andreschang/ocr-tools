@@ -3,21 +3,23 @@ Open Climate Research is an ongoing project that aims to facilitate creative exp
 
 ## Installing / Getting started
 
-Make sure your Python environment meets a few basic requirements. OCR Tools just needs Numpy, Matplotlib, Basemap, and NetCDF4. 
+OCR Tools runs in Python, and it requires a few basic packages: [Matplotlib](https://matplotlib.org/), [Basemap](https://matplotlib.org/basemap/), and [NetCDF4](http://unidata.github.io/netcdf4-python/). If you are new to Python, the easiest way to install these packages is with a package manager like [Anaconda](https://conda.io/docs/user-guide/tasks/manage-environments.html) or [Canopy](https://www.enthought.com/product/canopy/).
 
-[Anaconda](https://conda.io/docs/user-guide/tasks/manage-environments.html) users can set up their environment like this:
+Anaconda users can set up their environment by running the following command:
 
 ```shell
 conda env create -f environment.yml
 source activate ocrtools
 ```
 
-Next, set your data directories in the Global Variables section of reformat_data.py (around line 20), and you're all set. Reference the reformat_data.py from any python file in the same directory to use tools. A few sample usages can be found in reformat_live.py.
+Once your environment is ready, start exploring ```demo.py```.  The ```ocrtools``` folder is preloaded with a ```data``` directory and sample climate data, so it should run out of the box.
+
+
 
 ## Features
 
 * Explore a climate data netCDF without knowing anything about climate data or netCDFs.
-* Perform analysis with just a few basic parameters – at minimum, `variable`, `yr0`, and `yrf`.
+* Perform analysis with just a few basic parameters – at minimum, `variable`, `yr0`, ```src```, and `yrf`.
 * Plot a timeseries of the spatial average of any variable over a user-defined area and print a map of the area.
 * Reformat giant netCDFs into a set of manageable chunks that can be reassembled automatically by OCR Tools when needed.
 * Automatic file naming and organization
