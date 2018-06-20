@@ -10,7 +10,7 @@ from netCDF4 import Dataset, num2date
 
 ## Global variables
 
-version = "4.2"
+version = "4.3"
 ndivs = {'daily': 365, 'monthly':12}
 cice_vars = ['aice', 'hi', 'flwdn', 'fswdn']
 cam_vars = ['TS', 'PRECT']
@@ -45,9 +45,9 @@ class stage(object):
       self.directories = {"cesm-raw": "data/raw", "cesm-reformatted": "data/reformatted", \
       "other-reformatted": "data/reformatted", "scratch": "data/scratch", "plot":"test_plots", \
       "csv": "data/streams"}
-    self.naming = {"cesm-reformatted": ["var_name", "dt", "cesm_mem", "time_slice"], \
+    self.naming = {"cesm-reformatted": ["var_name", "dt", "mem", "time_slice"], \
     "other-reformatted": ["var_name", "dt", "time_slice"], "spatial_average": ["var_name", \
-    "dt", "time_slice", "mean", "scratchId"], "cesm_report": ["var_name", "dt", "cesm_mem"], \
+    "dt", "time_slice", "mean", "scratchId"], "cesm_report": ["var_name", "dt", "mem"], \
     "other-report": ["var_name", "dt"]}
     self.time_as = time_as
     self.base_yr = 1920

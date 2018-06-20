@@ -10,7 +10,7 @@ from netCDF4 import Dataset, num2date
 
 ## Global variables
 
-version = "4.2"
+version = "4.3"
 ndivs = {'daily': 365, 'monthly':12}
 cice_vars = ['aice', 'hi', 'flwdn', 'fswdn']
 cam_vars = ['TS', 'PRECT']
@@ -43,9 +43,9 @@ class query(object):
     try:
       self.naming = stage.naming
     except:
-      self.naming = {"cesm-reformatted": ["var_name", "dt", "cesm_mem", "time_slice"], \
+      self.naming = {"cesm-reformatted": ["var_name", "dt", "mem", "time_slice"], \
     "other-reformatted": ["var_name", "dt", "time_slice"], "spatial-average": ["var_name", \
-    "dt", "yr_range", "mean", "scratchId"], "cesm-report": ["var_name", "dt", "cesm_mem"], \
+    "dt", "yr_range", "mean", "scratchId"], "cesm-report": ["var_name", "dt", "mem"], \
     "other-report": ["var_name", "dt"]}
     try:
       self.time_as = stage.time_as
@@ -154,6 +154,7 @@ class query(object):
     custom_tags, print_report, add_to_report = self.assign_reporting_vars(kwargs)
     ts_var, offset = self.timesync(kwargs)
     ts_var = ts_var[:self.nt]
+    print(ts_var.shape)
     self.function = 'spatial_average'
     mvar = []
 
@@ -423,15 +424,15 @@ class query(object):
         self.dt = input("Please enter dt (monthly or daily): ")
 
       try:
-        self.cesm_mem = kwargs["cesm_mem"]
+        self.mem = kwargs["mem"]
       except KeyError:
-        self.cesm_mem = int(input("Please enter CESM member (2-34 or 1850): "))
+        self.mem = int(input("Please enter CESM member (2-34 or 1850): "))
 
       if self.var_name in cice_vars:
         try:
-          self.cesm_hemisphere = kwargs["cesm_hemisphere"]
+          self.hemisphere = kwargs["hemisphere"]
         except KeyError:
-          self.cesm_hemisphere = input("Please enter CESM hemisphere (nh or sh): ")
+          self.hemisphere = input("Please enter CESM hemisphere (nh or sh): ")
 
       try:
         self.yr0 = int(kwargs["yr0"])
@@ -453,6 +454,18 @@ class query(object):
 
       self.fname = self.fill_cesm_params()
       self.f_open = None
+
+  def set_yr0(self, yr0):
+    try:
+      self.yr0 = yr0
+    except:
+      raise
+
+  def set_yrf(self, yrf):
+    try:
+      self.yrf = yrf
+    except:
+      raise
 
   def first_look(self, **kwargs):
     try:
@@ -488,17 +501,22 @@ class query(object):
   def extract_data(self):
     
     ## 1. LOAD DATA
+    start_index = 0
     if self.f_open == None:
+      try:
+        self.file, start_index, end_index = self.grab_reduced_data()
+        self.data_yr0 = [self.yr0]
+      except:
+        pass
       self.f_open = Dataset(self.file[0])
 
     self.axes = {}
     self.axes['time']  = self.dim.index(self.time_name)
-    self.var = self.f_open.variables[self.src_var_name][:]
+    self.var = self.f_open.variables[self.src_var_name][start_index:]
     print(self.var.shape)
 
     for ff in np.arange(1, len(self.file)):
-      print(ff)
-      print('concatenating')
+      print('Concatenating netcdf '+str(ff))
       add_f_open = Dataset(self.file[ff])
       self.var = np.concatenate((self.var, add_f_open.variables[self.src_var_name][:]), axis = self.axes['time'])
       add_f_open.close()
@@ -526,6 +544,39 @@ class query(object):
 
     self.f_open.close()
     self.f_open = None
+
+  def grab_reduced_data(self):
+
+    if self.src == 'cesm':
+      folder_type = 'cesm-reformatted'
+    else:
+      folder_type = 'other-reformatted'
+
+    if "yr_range" in self.subfolders[folder_type]:
+      yr_range = str(self.yr0)+'-'+str(self.yrf)
+      ideal_folder = self.folder_path(folder_type)
+      end_index = ideal_folder.find(yr_range)
+      f0 = ideal_folder[0:end_index]
+      print("Checking for reduced data in "+f0)
+
+      subdirs = self.get_subs(f0)
+      yr_ranges = [[int(x.split('-')[0]), int(x.split('-')[1])] for x in subdirs]
+
+      for span in yr_ranges:
+        if ((span[0] <= self.yr0) and (span[1]-1 >= self.yrf)):
+          target_folder = f0+('-').join(map(str, span))
+          print('Fetching reduced data from '+target_folder)
+          rf_yr0 = span[0]
+          nstartfile, start_index = divmod((self.yr0-rf_yr0)*ndivs[self.dt], 120)
+          endfile, end_index = divmod((self.yrf-rf_yr0+1)*ndivs[self.dt], 120)
+          all_ncs = self.get_ncs(target_folder)
+          target_ncs = [target_folder+'/'+file for file in all_ncs[nstartfile:endfile+1]]
+          self.simple_params()
+
+          return target_ncs, start_index, end_index
+        else:
+          return False
+      return False
 
   def get_latlon_indices(self, lat_bounds = [-89., 89.], lon_bounds = [-179., 179.], \
     lon_bound_convert = True, data_wrap_lon = 0, print_report = True, directory = 'scratch'):
@@ -694,17 +745,17 @@ class query(object):
 
   def fill_cesm_params(self, **kwargs):
 
-    if ((self.cesm_mem != 1850) and (self.yr0 < 2006) and (self.yrf < 2006)):
+    if ((self.mem != 1850) and (self.yr0 < 2006) and (self.yrf < 2006)):
       self.data_yr0, self.data_yrf = [1920], [2005]
-    elif ((self.cesm_mem != 1850) and (self.yr0 >= 2006) and (self.yrf >= 2006)):
+    elif ((self.mem != 1850) and (self.yr0 >= 2006) and (self.yrf >= 2006)):
       self.data_yr0, self.data_yrf = [2006], [2080]
-    elif ((self.cesm_mem == 1850) and (self.yr0 < 2000) and (self.yrf < 2000)):
+    elif ((self.mem == 1850) and (self.yr0 < 2000) and (self.yrf < 2000)):
       self.data_yr0, self.data_yrf = [1900], [1999]
-    elif ((self.cesm_mem == 1850) and (self.yr0 >= 2000) and (self.yrf >= 2000)):
+    elif ((self.mem == 1850) and (self.yr0 >= 2000) and (self.yrf >= 2000)):
       self.data_yr0, self.data_yrf = [2000], [2099]
-    elif ((self.cesm_mem == 1850) and (self.yr0 < 2000) and (self.yrf >= 2000)):
+    elif ((self.mem == 1850) and (self.yr0 < 2000) and (self.yrf >= 2000)):
       self.data_yr0, self.data_yrf = [1900, 2000], [1999, 2099]
-    elif ((self.cesm_mem != 1850) and (self.yr0 < 2006) and (self.yrf >= 2006)):
+    elif ((self.mem != 1850) and (self.yr0 < 2006) and (self.yrf >= 2006)):
       self.data_yr0, self.data_yrf = [1920, 2006], [2005, 2080]
 
     print(self.data_yr0)
@@ -717,11 +768,11 @@ class query(object):
         self.var_name = self.var_name.replace('_d', '')
 
       if self.var_name in cice_vars:
-        self.cesm_grid, self.cesm_model = 'cice', 'ice'
+        self.cesm_grid, self.model = 'cice', 'ice'
         self.lon_name = 'TLON'
         self.lat_name = 'TLAT'
         self.cellarea_name = 'tarea'
-        f_hem = "_"+self.cesm_hemisphere
+        f_hem = "_"+self.hemisphere
         if self.dt == 'daily':
           self.src_var_name = self.var_name+'_d'
           f_h = "h1"
@@ -732,7 +783,7 @@ class query(object):
           f_date = str(self.data_yr0[m]) + '01-' + str(self.data_yrf[m]) + '12'
 
       elif self.var_name in cam_vars:
-        self.cesm_grid, self.cesm_model = 'cam', 'atm'
+        self.cesm_grid, self.model = 'cam', 'atm'
         self.lon_name = 'lon'
         self.lat_name = 'lat'
         f_hem = ""
@@ -745,11 +796,11 @@ class query(object):
           f_h = "h0"
           f_date = str(self.data_yr0[m]) + '01-' + str(self.data_yrf[m]) + '12'
 
-      if (self.cesm_mem == 1850):
+      if (self.mem == 1850):
         f0 = 'b.e11.B1850C5CN.f09_g16.005.' + self.cesm_grid
 
       else:
-        fmem = '{:03d}'.format(self.cesm_mem)
+        fmem = '{:03d}'.format(self.mem)
         if self.data_yr0[m] < 2006:
           f0 = 'b.e11.B20TRC5CNBDRD.f09_g16.' + fmem + '.' + self.cesm_grid
         elif self.data_yr0[m] >= 2006:
@@ -833,10 +884,10 @@ class query(object):
       except:
         pass
       if self.src == 'cesm':
-        subs["mem"] = self.cesm_mem
-        subs["model"] = self.cesm_model
+        subs["mem"] = self.mem
+        subs["model"] = self.model
         if self.var_name in cice_vars:
-          subs["hemisphere"] = self.cesm_hemisphere
+          subs["hemisphere"] = self.hemisphere
 
       subfolders = [subs[n] for n in self.subfolders[directory]]
       fpath = '/'.join(([self.directories[directory]]+subfolders))+'/'
@@ -865,7 +916,7 @@ class query(object):
 
       if ((self.src == 'cesm')):
         name_type, folder_type = "cesm-reformatted", "cesm-reformatted"
-        subs["cesm_mem"] = 'm'+'{:03d}'.format(self.cesm_mem)
+        subs["mem"] = 'm'+'{:03d}'.format(self.mem)
       else:
         name_type, folder_type = "other-reformatted", "other-reformatted"
 
@@ -876,8 +927,8 @@ class query(object):
       subs["time_slice"] =str(self.yr0)+'-'+str(self.yrf)
       name_type = 'spatial_average'
       if self.src == 'cesm':
-        self.naming[name_type].insert(2, 'cesm_mem')
-        subs["cesm_mem"] = 'm'+'{:03d}'.format(self.cesm_mem)
+        self.naming[name_type].insert(2, 'mem')
+        subs["mem"] = 'm'+'{:03d}'.format(self.mem)
 
       if mode == 'spatial_average-plot':
         folder_type = 'plot'
@@ -935,4 +986,27 @@ class query(object):
     new_name = source_file
     os.rename(target_file, new_name)
 
+  def get_subs(self, a_dir):
+    if os.path.isdir(a_dir):
+      return [name for name in os.listdir(a_dir)
+              if os.path.isdir(os.path.join(a_dir, name))]
+    else:
+      return []
+
+  def get_ncs(self, a_dir):
+    all_ncs = []
+    for file in os.listdir(a_dir):
+      if file.endswith(".nc"):
+        all_ncs.append(file)
+    return all_ncs
+
+  def simple_params(self):
+    self.lat_name, self.lon_name, self.time_name = 'lat', 'lon', 'time'
+    self.cellarea_name = 'cellarea'
+    self.dim = ['time', 'lat', 'lon']
+
+    try:
+      self.src_var_name = self.var_name
+    except:
+      pass
 

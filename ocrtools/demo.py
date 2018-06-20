@@ -25,7 +25,7 @@ Let's find out more about the 'air' var.
 Uncomment the hashed lines to keep going!
 """
 
-#mystery_file.first_look(var = 'air')
+# mystery_file.first_look(var = 'air')
 
 """
 Still quite a few unknowns but we keep on chugging. 
@@ -34,8 +34,8 @@ of helpful feedback. I wonder if we can learn about air temperature in NYC...
 Let's make a new query object for that.
 """
 
-#nyc_temp = mystery_file
-#nyc_temp.set_params()
+# nyc_temp = mystery_file
+# nyc_temp.set_params(data_yr0 = 1948, dim = ["time", "lat", "lon"], var = "air", dt = "monthly")
 
 
 """
@@ -46,7 +46,7 @@ Maybe someday we will be able to select the analysis area on a map, but for now.
 That is a question for Google. Fill in the lat and lon ranges when you've got it figured out
 """
 
-#nyc_temp.spatial_average(lat_bounds = [40,42], lon_bounds = [-75, -73])
+# nyc_temp.spatial_average(lat_bounds = [40,42], lon_bounds = [-75, -73])
 
 """
 FYI, we can also set all of the parameters before submitting the script to save time 
