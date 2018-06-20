@@ -356,8 +356,10 @@ class query(object):
             print("Showing first values in time variable...\n")
             print(self.fvars[self.time_name][0:4])
 
-          data_yr0 = int(input('Enter data yr0: '))
-        self.data_yr0 = [data_yr0]
+          data_yr0 = input('Enter data yr0: ')
+
+        self.data_yr0 = [int(data_yr0)]
+        print(self.data_yr0)
 
       ## SET DT
       ##

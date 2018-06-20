@@ -35,7 +35,7 @@ Let's make a new query object for that.
 """
 
 # nyc_temp = mystery_file
-# nyc_temp.set_params(data_yr0 = 1948, dim = ["time", "lat", "lon"], var = "air", dt = "monthly")
+# nyc_temp.set_params()
 
 
 """
