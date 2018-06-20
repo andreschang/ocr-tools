@@ -1,2 +1,3 @@
 ocrtools/ocrtools/*pyc
 ocrtools/ocrtools/__pycache__
+ocrtools/test_plots/*png
