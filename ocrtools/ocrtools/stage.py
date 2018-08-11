@@ -29,7 +29,7 @@ class stage(object):
       "scratch": "/Volumes/Samsung_T5/Open_Climate_Research-Projects/data/scratch", \
       "plot": "/Volumes/Samsung_T5/Open_Climate_Research-Projects/data/test_plots", \
       "csv": "/Volumes/Samsung_T5/Open_Climate_Research-Projects/data/streams"}
-      self.subfolders = {"cesm-raw": ['dt', 'src_var_name'], "cesm-reformatted": ["var_name", "yr_range"],
+      self.subfolders = {"cesm-raw": ['dt', 'var_name'], "cesm-reformatted": ["var_name", "yr_range"],
       "other-reformatted": ["var_name", "yr_range"], "scratch": [], "plot": ["function"]}
     elif preset == 'ucar':
       self.directories = {"cesm-raw": "/glade/p/cesmLE/CESM-CAM5-BGC-LE", \

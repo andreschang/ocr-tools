@@ -161,8 +161,10 @@ class query(object):
     ## 2. CRUNCH IT UP!
     ## Only works with 2d variables rn
     ##
-
-    lat_indices, lon_indices = self.get_latlon_indices(lat_bounds, lon_bounds, print_report = print_report,\
+    if output == 'list':
+      lat_indices, lon_indices = self.get_latlon_indices(lat_bounds, lon_bounds, print_report = False)
+    else:
+      lat_indices, lon_indices = self.get_latlon_indices(lat_bounds, lon_bounds, print_report = print_report, \
       directory = output)
 
     if len(self.lat0.shape) == 1:
@@ -183,14 +185,15 @@ class query(object):
           ts_var[0, lat_indices[i], lon_indices[i]]) < 3e10:
           sum_var += ts_var[:, lat_indices[i], lon_indices[i]]*self.cellarea0[lat_indices[i], lon_indices[i]]
           total_area += self.cellarea0[lat_indices[i], lon_indices[i]]
-      print(sum_var)
-      print(total_area)
+      # print(sum_var)
+      # print(total_area)
       mvar0 = sum_var/total_area
-      print(mvar0)
+      # print(mvar0)
 
     roundEnd = (self.yrf-self.yr0+1)*self.ndiv
     mvar += list(mvar0)[:roundEnd]
     xtime = np.arange(self.yr0, self.yrf+1, 1./self.ndiv)
+    print('Spatial average created with length (time), '+str(len(mvar)))
 
     if output == 'plot':
       import matplotlib.pyplot as plt
@@ -244,7 +247,7 @@ class query(object):
           self.var_name = input('Enter main variable: ')
 
       self.src_var_name = self.var_name
-      fdim = list(self.fvars[self.var_name].dimensions)
+      fdim = list(self.fvars[self.src_var_name].dimensions)
 
       ## SET LON AND LAT NAMES
       ##
@@ -740,6 +743,10 @@ class query(object):
       self.yrf = self.yr0-1+int(self.nt/self.ndiv)
 
     print(self.yrf)
+    print('offset')
+    print(offset)
+    print('nt')
+    print(self.nt)
     try:
       return self.var[offset:], offset
     except:
