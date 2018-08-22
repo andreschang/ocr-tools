@@ -1,3 +1,4 @@
-ocrtools/ocrtools/*pyc
+*pyc
 ocrtools/ocrtools/__pycache__
 ocrtools/test_plots/*png
+ocrtools/ocrtools.egg-info*
