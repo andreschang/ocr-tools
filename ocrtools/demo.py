@@ -39,8 +39,8 @@ Let's make a new query object for that.
 
 
 """
-Yep, set_params takes a look at the data, autofills the parameters that it can
-deduce by itself, and offers suggestions for some of the trickier ones like data_yr0.
+set_params takes a look at the data, autofills the parameters that it can figure out, 
+and offers suggestions for some of the trickier ones like data_yr0.
 Now we are ready to look at temperature over NYC. Uhh where is NYC?
 Maybe someday we will be able to select the analysis area on a map, but for now...
 That is a question for Google. Fill in the lat and lon ranges when you've got it figured out
@@ -66,5 +66,5 @@ In fact, if you know the variable you're looking for, all you need to enter is t
 
 # print("\nCESM ANALYSIS")
 # cesm_aice = query(stage = demo, src = 'cesm')
-# cesm_aice.set_params(yr0 = 1980, yrf = 2050, cesm_mem = 2, var = 'aice')
+# cesm_aice.set_params(yr0 = 1980, yrf = 2050, mem = 2, dt = 'monthly', var = 'aice', hemisphere = 'nh')
 # cesm_aice.spatial_average(lat_bounds = [80, 89], lon_bounds = [-179, 179])
