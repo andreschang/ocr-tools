@@ -14,8 +14,6 @@ import errno
 from datetime import datetime
 from netCDF4 import Dataset, num2date
 
-## Global variables
-
 ndivs = {'daily': 365, 'monthly':12}
 cice_vars = ['aice', 'hi', 'flwdn', 'fswdn']
 cam_vars = ['TS', 'PRECT']
@@ -23,8 +21,20 @@ now = datetime.now()
 scratchId = now.strftime("%Y%m%d%H%M")
 
 class query(object):
-
   def __init__(self, stage = None, verbose = True, **kwargs):
+    """
+    Initializes a query. This is the core analysis feature of ocrtools.
+    Should always be followed by set_params function
+    
+    Args:
+    * stage (stage class object) [optional]: see stage.py for documentation
+    * verbose (bool)
+
+    Kwargs:
+    * file (str): path to data addressed by query. If not specified, this will be
+    assigned by the user or automatically when the set_params function is executed
+    * src (str): helps ocrtools autofill parameters, if the source is known (ex. CESM)
+    """
 
     self.verbose = verbose
     try:
@@ -65,6 +75,10 @@ class query(object):
   ########################
 
   def reduce_data(self, **kwargs):
+    """
+    Slices large datasets into manageable pieces that can later be accessed
+    to save time and memory
+    """
 
     custom_tags, print_report, add_to_report = self.assign_reporting_vars(kwargs)
     ts_var, offset = self.timesync(kwargs)
@@ -155,6 +169,21 @@ class query(object):
       np.savetxt(report_out, [report], fmt = '%s')
 
   def spatial_average(self, lat_bounds = [-89., 89.], lon_bounds = [-179., 179.], lon_convert = True, output = 'plot', **kwargs):
+    """
+    Calculates the weighted average of a 3-dimensional variable (2D space and time)
+    and outputs a graph or list of the timeseries. Must be run after set_params
+
+    Args:
+    * lat_bounds (list) [optional]: 2-item list of lower and upper latitude bounds
+    * lon_bounds (list) [optional]: 2-item list of longitude bounds (use '-' for longitudes
+      west of the prime meridian and positive for east [-180 to 180] OR set values in the range
+      [0-360] and set lon_convert to FALSE)
+    * lon_convert (bool) [optional]: most climate datasets (perhaps not all) use longitude
+      between 0-360, instead of the more intuitive -180 to 180. This will convert the longitudinal
+      range by default
+    * output (str) [optional]: output timeseries as a 'plot', 'csv', or 'list'. Plot and csv are
+      saved as specified by the stage. List does not save external to python script.
+    """
 
     custom_tags, print_report, add_to_report = self.assign_reporting_vars(kwargs)
     ts_var, offset = self.timesync(kwargs)
@@ -164,7 +193,7 @@ class query(object):
     mvar = []
 
     ## 2. CRUNCH IT UP!
-    ## Only works with 2d variables rn
+    ## Only works with 2d variables currently
     ##
     if output == 'list':
       lat_indices, lon_indices = self.get_latlon_indices(lat_bounds, lon_bounds, print_report = False)
@@ -219,37 +248,146 @@ class query(object):
     elif output == 'list':
       return mvar
 
-  def set_params(self, src = 'unknown', **kwargs):
-    ## 'interactive' mode opens up the file, prompting the user to
-    ## set each param. 'cesm' mode sets up the file automatically
+  def set_params(self, **kwargs):
+    """
+    Sets the parameters that enable ocrtools to read the data file.
+    This function is highly flexible.
+
+    A key feature of ocrtools is that is reads metadata and autofills as
+    many parameters as possible. If src is unknown, ocrtools will prompt the user
+    to set parameters interactively (and offer lots of help). 
+
+    If src is known and supported (only 'cesm' in v0.1), many parameters (including 
+    file path) are set automatically; however, the user still must specify some info
+    about the analysis (ex. yr0 and yrf), so that ocrtools knows which file(s) to use
+
+    Parameters do NOT have to be set interactively; they can also be included
+    as kwargs. See below
+
+    Kwargs:
+    * src (str) [optional]: source of raw data file. Overrides any src set in query init. 
+      If src has not been set (or src is not recognized), src is treated as 'unknown'
+
+    Kwargs (src = 'unknown'):
+    * file (str) [optional]: overrides any filepath set in query init. If both left
+      blank, user must input interactively
+    * var (str) [optional]: main variable examined by query. If left blank,
+      ocrtools will run first_look() and prompt user to input interactively
+    * lat_name (str) [optional]: name of lat dimension. If left blank, ocrtools will
+      autofill or prompt user to input interactively
+    * lon_name (str) [optional]: name of lon dimension. If left blank, ocrtools will
+      autofill or prompt user to input interactively
+    * time_name (str) [optional]: name of time dimension. If left blank, ocrtools will
+      autofill or prompt user to input interactively
+    * data_yr0 (int) [optional]: first year of data. ALL DATA ASSUMED TO START AT 
+      BEGINNING OF CALENDAR YEAR. If left blank, ocrtools will provide help so the 
+      user can input interactively
+    * dt (str) [optional]: "monthly" or "daily". If left blank, ocrtools will provide
+      help so the user can input interactively
+    * dim (list) [optional]: list of all main variable dimensions (strings) in order. 
+      If left blank, ocrtools will provide help so the user can input interactively
+    * cellarea_name (str) [optional]: only needed for non-rectilinear grids (i.e. grid 
+      where each lat/lon point has a 2d reference pair). If left blank and grid is 
+      non-rectilinear, will autofill or prompt user to input interactively
+    * level_name (str) [optional]: only needed for 4D data (ex. space, time, and depth
+      like atmospheric or ocean level). If left blank and data is 4D, will autofill or
+      prompt user to input interactively
+    * yr0 (int) [optional]: calendar year 0 examined by query. Can be set later with
+      set_yr0() or if never specified, query will set yr0 = data_yr0
+    * yrf (int) [optional]: calendar year F (inclusive) examined by query. Can be set 
+      later with set_yrf or if never specified, query will set yrf as the final year 
+      of data
+
+    Kwargs (src = 'cesm'):
+    * var (str) [optional]: name of main variable examined by query. Does not 
+      need to include timestep tag (ex. daily TS should be var = 'TS', 
+      not var = 'TS_d'). If left blank, user must input interactively
+    * dt (str) [optional]: "monthly" or "daily". If left blank, user must 
+      input interactively
+    * mem (int) [optional]: CESM member 2-34 or 1850 (control run). If left blank,
+      user must input interactively
+    * hemisphere (str) [optional]: only for cice model variables "nh" or "sh"
+    * yr0 (int) [optional]: calendar year 0 examined by query. If left blank,
+      user must input interactively
+    * yrf (int) [optional]: calendar year F (inclusive) examined by query. If left
+      blank, user must input interactively
+    * ndim (int) [optional]: number of dimensions in main variable (3 or 4). If left
+      blank, user must input interactively
+    """
 
     try:
-      src = self.src
-    except:
-      pass
-
-    if src == 'unknown':
-
-      self.src = 'unknown'
+      src = kwargs["src"]
+    except KeyError:
       try:
-        self.file
+        src = self.src
       except AttributeError:
+        src = 'unknown'
+    self.src = src
+
+    if src == 'cesm':
+      try:
+        var_name0 = kwargs["var"]
+      except KeyError:
+        var_name0 = input("Please enter variable name: ")
+      if var_name0[-2:len(var_name0)] == "_d":
+        self.var_name = var_name0[:(len(var_name0)-2)]
+      else:
+        self.var_name = var_name0
+
+      try:
+        self.dt = kwargs["dt"]
+      except KeyError:
+        self.dt = input("Please enter dt (monthly or daily): ")
+
+      try:
+        self.mem = kwargs["mem"]
+      except KeyError:
+        self.mem = int(input("Please enter CESM member (2-34 or 1850): "))
+
+      if self.var_name in cice_vars:
         try:
-          self.file = [kwargs["file"]]
+          self.hemisphere = kwargs["hemisphere"]
         except KeyError:
+          self.hemisphere = input("Please enter CESM hemisphere (nh or sh): ")
+
+      try:
+        self.yr0 = int(kwargs["yr0"])
+      except KeyError:
+        self.yr0 = int(input("Please enter yr0 of analysis: "))
+
+      try:
+        self.yrf = int(kwargs["yrf"])
+      except KeyError:
+        self.yrf = int(input("Please enter yrf of analysis (inclusive): "))
+
+      try:
+        self.dim = kwargs["dim"]
+      except KeyError:
+        try:
+          self.ndim = kwargs["ndim"] 
+        except KeyError:
+          self.ndim = int(input("Please enter the number of dimensions in your CESM variable (3 or 4): "))
+
+      self.fname = self.fill_cesm_params()
+      self.f_open = None
+
+    else:
+      print("")
+      try:
+        self.file = [kwargs["file"]]
+      except KeyError:
+        try:
+          self.file
+        except AttributeError:
           self.file = [input('Enter file: ')]
 
-
       try:
-        self.var_name
-      except AttributeError:
-        try:
-          self.var_name = kwargs["var"]
-          self.f_open = Dataset(self.file[0])
-          self.fvars = self.f_open.variables
-        except KeyError:        
-          self.first_look()
-          self.var_name = input('Enter main variable: ')
+        self.var_name = kwargs["var"]
+        self.f_open = Dataset(self.file[0])
+        self.fvars = self.f_open.variables
+      except KeyError:        
+        self.first_look()
+        self.var_name = input('Enter main variable: ')
 
       self.src_var_name = self.var_name
       fdim = list(self.fvars[self.src_var_name].dimensions)
@@ -305,6 +443,8 @@ class query(object):
 
           if(manual_entry == False):
             print("cellarea_name set to "+self.cellarea_name)
+        else:
+          self.cellarea_name = None
 
       ## SET TIME NAME
       ##
@@ -316,7 +456,7 @@ class query(object):
         elif('TIME' in self.fvars):
           self.time_name = 'TIME'
         else:
-          print("\nCould not set lat and lon names automatically.\nShowing all variable metadata ... \n")
+          print("\nCould not set time name automatically.\nShowing all variable metadata ... \n")
           print(self.fvars[self.var_name])
           self.time_name = input('\nEnter time_name: ')
 
@@ -420,64 +560,19 @@ class query(object):
       if "yrf" in kwargs:
         self.yrf = int(kwargs["yrf"])
 
-    elif src == 'cesm':
-      self.src = 'cesm'
-      print("")
-      try:
-        self.var_name = kwargs["var"]
-      except KeyError:
-        self.var_name = input("Please enter variable name: ")
-
-      try:
-        self.dt = kwargs["dt"]
-      except KeyError:
-        self.dt = input("Please enter dt (monthly or daily): ")
-
-      try:
-        self.mem = kwargs["mem"]
-      except KeyError:
-        self.mem = int(input("Please enter CESM member (2-34 or 1850): "))
-
-      if self.var_name in cice_vars:
-        try:
-          self.hemisphere = kwargs["hemisphere"]
-        except KeyError:
-          self.hemisphere = input("Please enter CESM hemisphere (nh or sh): ")
-
-      try:
-        self.yr0 = int(kwargs["yr0"])
-      except KeyError:
-        self.yr0 = int(input("Please enter yr0 of analysis: "))
-
-      try:
-        self.yrf = int(kwargs["yrf"])
-      except KeyError:
-        self.yrf = int(input("Please enter yrf of analysis (inclusive): "))
-
-      try:
-        self.dim = kwargs["dim"]
-      except KeyError:
-        try:
-          self.ndim = kwargs["ndim"] 
-        except KeyError:
-          self.ndim = int(input("Please enter the number of dimensions in your CESM variable (3 or 4): "))
-
-      self.fname = self.fill_cesm_params()
-      self.f_open = None
-
-  def set_yr0(self, yr0):
-    try:
-      self.yr0 = yr0
-    except:
-      raise
-
-  def set_yrf(self, yrf):
-    try:
-      self.yrf = yrf
-    except:
-      raise
-
   def first_look(self, **kwargs):
+    """
+    Opens a netcdf file and prints a list of variables
+    or metadata of a specified variable
+
+    Kwargs:
+    * file (string) [optional]: path to netcdf data file. If left blank,
+      user must input interactively
+    * var (string) [optional]: name of main variable to be examined. If
+      left blank, ocrtools will just print all variable keys (skipping 
+      metadata of the main variable)
+    """
+
     try:
       self.f_open
     except:
@@ -503,7 +598,6 @@ class query(object):
     except:
       print("\nShowing variables ...\n")
       print(', '.join(self.f_open.variables.keys())+'\n')
-
 
   ## Core data-wrangling utilities ##
   ###################################
@@ -830,6 +924,31 @@ class query(object):
       folder_path = self.folder_path("cesm-raw")
       self.file.append(folder_path+f)
       print(self.file)
+
+  def set_yr0(self, yr0):
+    """
+    Can be used to set yr0 of query object at any time
+
+    Args:
+    yr0 (int): calendar year 0 of query analysis
+    """
+
+    try:
+      self.yr0 = yr0
+    except:
+      raise
+
+  def set_yrf(self, yrf):
+    """
+    Can be used to set yrf of query object at any time
+
+    Args:
+    yrf (int): calendar year F (inclusive) of query analysis
+    """
+    try:
+      self.yrf = yrf
+    except:
+      raise
 
   ## More data-wrangling utilities ##
   ###################################

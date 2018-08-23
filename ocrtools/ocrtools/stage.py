@@ -24,7 +24,7 @@ class stage(object):
   def __init__(self, preset = 'andres_local', time_as = 'sequence'):
 
     """
-    stage is used to manage file organization, naming, and output in conjunction with query and build.
+    stage is used to manage file organization, naming, and output in conjunction with query and build
 
     A few challenges of working with climate data:
     - Raw data files can be very large (and slow)
@@ -33,13 +33,13 @@ class stage(object):
     has been closed (ex. what are the exact coordinates that were used in a spatial average?)
 
     stage addesses these by allowing you to define a directory structure and naming convention for
-    both the source data and output of ocrtools. Most query functions rely on this.
+    both the source data and output of ocrtools. Most query functions rely on this
 
     Args:
-    * preset: specifies folder structure for existing data and new output. Please add your 
+    * preset (str) [optional]: specifies folder structure for existing data and new output. Please add your 
       own preset and make it the default!
-    * time_as: 'sequence' (ex. base1920.34310, as in 34310 days after 1920-000 [2014]) or
-      'date' (ex. 2014-000).
+    * time_as (str) [optional]: 'sequence' (ex. base1920.34310, as in 34310 days after 1920-000 [2014]) or
+      'date' (ex. 2014-000)
     """
 
     if preset == 'andres_local':
