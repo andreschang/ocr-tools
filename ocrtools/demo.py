@@ -75,6 +75,6 @@ In fact, if you know the variable you're looking for, all you need to enter is t
 """
 
 # print("\nCESM ANALYSIS")
-# cesm_aice = query(stage = demo, src = 'cesm')
-# cesm_aice.set_params(yr0 = 1980, yrf = 2050, mem = 2, dt = 'monthly', var = 'aice', hemisphere = 'nh')
+# cesm_aice = query(stage = demo)
+# cesm_aice.set_params(yr0 = 1980, yrf = 2050, src = 'cesm, mem = 2, dt = 'monthly', var = 'aice', hemisphere = 'nh')
 # cesm_aice.spatial_average(lat_bounds = [80, 89], lon_bounds = [-179, 179])
