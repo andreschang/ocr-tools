@@ -1,12 +1,18 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+###############################################################################
+#  
+#  OCRTOOLS - Making climate data malleable
+#  Copyright (C) 2018 Andres Chang
+#
+###############################################################################
+
 import numpy as np
 import os, os.path
 import errno
 from datetime import datetime
 from netCDF4 import Dataset, num2date
-
-## Tools to improve malleability of climate data for 
-## research and visualization purposes.
-## 
 
 ## Global variables
 

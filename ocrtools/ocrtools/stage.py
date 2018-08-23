@@ -1,12 +1,18 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+###############################################################################
+#  
+#  OCRTOOLS - Making climate data malleable
+#  Copyright (C) 2018 Andres Chang
+#
+###############################################################################
+
 import numpy as np
 import os, os.path
 import errno
 from datetime import datetime
 from netCDF4 import Dataset, num2date
-
-## Tools to improve malleability of climate data for 
-## research and visualization purposes.
-## 
 
 ## Global variables
 
@@ -17,10 +23,27 @@ now = datetime.now()
 scratchId = now.strftime("%Y%m%d%H%M")
 
 class stage(object):
-
   def __init__(self, preset = 'andres_local', time_as = 'sequence'):
-  ## Preset specifies folder schema and location of CESM data
-  # preset = 'andres_local'
+
+    """
+    stage is used to manage file organization, naming, and output in conjunction with query and build.
+
+    A few challenges of working with climate data:
+    - Raw data files can be very large (and slow)
+    - Filenames are hard to read and can look very similar
+    - Hard to remember the details of a specific analysis or summary plot once the Python script
+    has been closed (ex. what are the exact coordinates that were used in a spatial average?)
+
+    stage addesses these by allowing you to define a directory structure and naming convention for
+    both the source data and output of ocrtools. Most query functions rely on this.
+
+    Args:
+    * preset: specifies folder structure for existing data and new output. Please add your 
+      own preset and make it the default!
+    * time_as: 'sequence' (ex. base1920.34310, as in 34310 days after 1920-000 [2014]) or
+      'date' (ex. 2014-000).
+    """
+
     if preset == 'andres_local':
       self.directories = {"cesm-raw": "/Volumes/Samsung_T5/Open_Climate_Research-Projects/data/raw/cesm", \
       "cesm-reformatted": "/Volumes/Samsung_T5/Open_Climate_Research-Projects/data/reformatted/cesm", \
@@ -50,7 +73,4 @@ class stage(object):
     "other-report": ["var_name", "dt"]}
     self.time_as = time_as
     self.base_yr = 1920
-
-  def add_directory(self, add_directory_name, add_directory_path):
-    self.directories[add_directory_name] = add_directory_path
 
