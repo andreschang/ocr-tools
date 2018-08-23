@@ -14,8 +14,6 @@ import errno
 from datetime import datetime
 from netCDF4 import Dataset, num2date
 
-## Global variables
-
 ndivs = {'daily': 365, 'monthly':12}
 cice_vars = ['aice', 'hi', 'flwdn', 'fswdn']
 cam_vars = ['TS', 'PRECT']
