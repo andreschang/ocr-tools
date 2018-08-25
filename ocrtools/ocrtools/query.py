@@ -83,7 +83,7 @@ class query(object):
     * yr0 (int) [optional]: First year that will be used to make chunked data
       files
     * yrf (int) [optional]: Last year to be used for chunked data files
-    * custom_tags (str) [optional]: String added to output filenames
+    * custom_tag (str) [optional]: String added to output filenames
     * print_report (bool) [optional]: If True, adds a report with conversion
       info to the reduced data directory
     * add_to_report (str) [optional]: Text to be added to the report
@@ -97,7 +97,7 @@ class query(object):
     except:
       pass
 
-    custom_tags, print_report, add_to_report = self.assign_reporting_vars(kwargs)
+    custom_tag, print_report, add_to_report = self.assign_reporting_vars(kwargs)
     ts_var, offset = self.timesync()
 
     print(ts_var.shape)
@@ -114,8 +114,8 @@ class query(object):
 
       div_format = str(int(div_since_base_yr))
 
-      f_out = self.outfile(mode = 'reduce', div_since_base_yr = div_format, \
-        fYr0 = fYr0, fDiv0 = fDiv0, fYrF = fYrF, fDivF = fDivF, custom_tags = custom_tags)
+      f_out = self.outfile('reduce', div_since_base_yr = div_format, \
+        fYr0 = fYr0, fDiv0 = fDiv0, fYrF = fYrF, fDivF = fDivF, custom_tag = custom_tag)
 
       dataset = Dataset(f_out, 'w', format='NETCDF4_CLASSIC')
       fdims = {}
@@ -181,7 +181,7 @@ class query(object):
     ##
     if print_report == True:
       report += '\n\n'+add_to_report
-      report_out = self.outfile(mode = 'report', custom_tags = report_tag)
+      report_out = self.outfile('report', custom_tag = report_tag)
 
       np.savetxt(report_out, [report], fmt = '%s')
 
@@ -202,12 +202,12 @@ class query(object):
       saved as specified by the stage. List does not save external to python script.
 
     Kwargs:
-    * custom_tags (str) [optional]: String added to output filenames
+    * custom_tag (str) [optional]: String added to output filenames
     * print_report (bool) [optional]: If True, get_latlon_indices() will output a map
       off data points corresponding to the spatial average
     """
 
-    custom_tags, print_report, add_to_report = self.assign_reporting_vars(kwargs)
+    custom_tag, print_report, add_to_report = self.assign_reporting_vars(kwargs)
     ts_var, offset = self.timesync()
     ts_var = ts_var[:self.nt]
     print(ts_var.shape)
@@ -255,13 +255,13 @@ class query(object):
       import matplotlib.pyplot as plt
       print(xtime.shape, len(mvar))
       plt.plot(xtime, mvar)
-      f1 = self.outfile(mode = 'spatial_average-plot', custom_tags = custom_tags)
+      f1 = self.outfile('spatial_average-plot', custom_tag = custom_tag)
       plt.savefig(f1, dpi = 200)
       if print_report == True:
         self.name_sync(f1, ['mean'], ['bounded_area'])
 
     elif output == 'csv':
-      f1 = self.outfile(mode = 'spatial_average-csv', custom_tags = custom_tags)
+      f1 = self.outfile('spatial_average-csv', custom_tag = custom_tag)
       print(f1)
       np.savetxt(f1, mvar, delimiter = ',')
       if self.verbose == True:
@@ -999,16 +999,32 @@ class query(object):
   ###################################
 
   def bound_var(self, var, lat_indices, lon_indices, lat_axis = 1, lon_axis = 2):
-    ## trims variable down
-    ## to area covered by lon and lat indices
+    """
+    Trims variable down to area covered by lon and lat indices
+
+    Args:
+    * var (array): Main variables
+    * lat_indices (list): List of all lat indices in bounded area
+    * lon_indices (list): List of all lon indices in bounded area
+    * lat_axis (int) [optional]: Dimension axis of lat in main var
+    * lon_axis (int) [optional]: Dimension axis of lon in main var
+    """
 
     lon_bounded_var = np.take(var, lon_indices, axis = lon_axis)
     bounded_var = np.take(lon_bounded_var, lat_indices, axis = lat_axis)
     return bounded_var
 
   def reg_wgt(self, latmin, latmax, nlat):
-    ## returns a list of weighted values (sum = 1)
-    ## based on zonal parameters
+    """
+    Returns a list of weighted values (sum = 1) based on
+    latitudinal range for calculating spatial averages.
+    Assumes that lat bands are evenly spaced (ex. 10N, 20N, 30N...)
+
+    Args:
+    * latmin (int): Minimum lat of query area
+    * latmax (int): Maximum lat of query area
+    * nlat (int): Number of latitudinal bands
+    """
 
     dy = (latmax-latmin)/(nlat-1)
     lats = np.arange(latmin,latmax+dy,dy)[:nlat]
@@ -1027,10 +1043,18 @@ class query(object):
     return(wgts)
 
   def assign_reporting_vars(self, kwargs0):
+    """
+    Assigns variables based on kwargs to a number
+    of query functions
+
+    Args:
+    kwargs0 (dictionary)
+    """
+
     try:
-      custom_tags = kwargs0['custom_tags']
+      custom_tag = kwargs0['custom_tag']
     except KeyError:
-      custom_tags = []
+      custom_tag = ""
     try:
       print_report = kwargs0['print_report']
     except:
@@ -1039,9 +1063,19 @@ class query(object):
       add_to_report = kwargs0['add_to_report']
     except:
       add_to_report = ''
-    return custom_tags, print_report, add_to_report
+    return custom_tag, print_report, add_to_report
 
   def find_nearest(self, array,value):
+    """
+    Accepts an array of values and an input value.
+    Returns a tuple of nearest index and corresponding
+    value in the array
+
+    Args:
+    * Array (np array)
+    * Value (float)
+    """
+
     idx = (np.abs(array-value)).argmin()
     return (idx, array[idx])
 
@@ -1049,6 +1083,15 @@ class query(object):
   ##########################
 
   def folder_path(self, directory):
+    """
+    Returns folder path constructed from parent directory and 
+    subfolders specified by stage
+
+    Args:
+    * directory (str) [optional]: String reference to stage
+      directory type
+    """
+
     if self.directories != None:
 
       subs = {"dt": self.dt, "var_name": self.var_name, "proc": "proc", \
@@ -1073,7 +1116,22 @@ class query(object):
     else:
       return ''
 
-  def outfile(self, mode = '', custom_tags = [], **kwargs):
+  def outfile(self, mode, custom_tag = "", **kwargs):
+    """
+    Returns full filepath with filename constructed from output naming mode
+
+    Args:
+    * mode (str): Output naming mode specified in stage class
+    * custom_tag (str) [optional]: String added to output filenames
+
+    Kwargs depend on mode
+    """
+
+    if custom_tag == "":
+      custom_tag = []
+    else:
+      custom_tag = [custom_tag]
+
     abbrev = {'daily': 'd', 'monthly': 'mon'}
     exts = {'reduce': 'nc', 'report': 'txt', 'spatial_average-plot': 'png',
     'spatial_average-csv': 'csv'}
@@ -1114,13 +1172,17 @@ class query(object):
         folder_type = 'csv'
 
 
-    outfile_name = '.'.join([subs[seg] for seg in self.naming[name_type]]+custom_tags+[exts[mode]])
+    outfile_name = '.'.join([subs[seg] for seg in self.naming[name_type]]+custom_tag+[exts[mode]])
     outfile_folder = self.folder_path(folder_type)
     self.mkdir_p(outfile_folder)
 
     return outfile_folder+outfile_name
 
   def reduce_report(self):
+    """
+    Returns a report of what was accomplished by the reduce_data() function
+    """
+
     report_yr00, report_div00 = self.yr0, 0
     nfiles = int((self.yrf-self.yr0+1)*self.ndiv/120)
     yrf_div = nfiles*120+self.yr0*self.ndiv
@@ -1142,6 +1204,10 @@ class query(object):
     return report, report_tag
 
   def mkdir_p(self, path):
+    """
+    Makes a new directory if needed
+    """
+
     try:
         os.makedirs(path)
     except OSError as exc: # Python >2.5
@@ -1150,9 +1216,12 @@ class query(object):
         else: raise
 
   def name_sync(self, source_file, keywords, replacements):
-    ## Utility that takes scratch files produced with
-    ## scratchId and syncs their names to the main
-    ## output figure
+    """
+    Utility that takes scratch files produced with
+    scratchId and syncs their names to the main
+    output figure
+    """
+
     parent_folder = os.path.dirname(source_file)
     for file in os.listdir(parent_folder):
       if ((scratchId in file) and (replacements[0] in file)):
@@ -1165,6 +1234,9 @@ class query(object):
     os.rename(target_file, new_name)
 
   def get_subs(self, a_dir):
+    """
+    Returns list of subfolders in directory
+    """
     if os.path.isdir(a_dir):
       return [name for name in os.listdir(a_dir)
               if os.path.isdir(os.path.join(a_dir, name))]
@@ -1172,6 +1244,10 @@ class query(object):
       return []
 
   def get_ncs(self, a_dir):
+    """
+    Returns list of netcdf filenames in directory
+    """
+
     all_ncs = []
     for file in os.listdir(a_dir):
       if file.endswith(".nc"):
@@ -1179,6 +1255,11 @@ class query(object):
     return all_ncs
 
   def simple_params(self):
+    """
+    Used to set parameters based on the ocrtools convention
+    i.e. the convention to which all data is converted by reduce_data()
+    """
+
     self.lat_name, self.lon_name, self.time_name = 'lat', 'lon', 'time'
     self.cellarea_name = 'cellarea'
     self.dim = ['time', 'lat', 'lon']
