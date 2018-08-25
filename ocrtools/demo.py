@@ -12,22 +12,23 @@ import ocrtools.stage as st
 import ocrtools.query as query
 
 """
-Directory structure and naming conventions are set
-with ocrtools.stage
+File directory structure and naming conventions are specified
+by passing a stage object to the query class.
 """
-
 demo = st(preset = 'demo', time_as = 'date')
+query.stage = demo
 
 """
 ocrtools.query is used to explore climate data, set parameters,
 and transform the data.
 
-First, call a query object with stage and file (or src)
+First, call a query object with file (or src)
 Not sure what is in the file? Call first_look
 """
 print("\nMYSTERY FILE ANALYSIS")
-mystery_file = query(stage = demo, file = 'data/raw/air.mon.mean.nc' )
+mystery_file = query(file = 'data/raw/air.mon.mean.nc' )
 mystery_file.first_look()
+
 
 """
 Ok, so we can tell that there are 4 variables: lat, lon, time, and air
@@ -75,6 +76,6 @@ In fact, if you know the variable you're looking for, all you need to enter is t
 """
 
 # print("\nCESM ANALYSIS")
-# cesm_aice = query(stage = demo, src = 'cesm')
+# cesm_aice = query(src = 'cesm')
 # cesm_aice.set_params(yr0 = 1980, yrf = 2050, mem = 2, dt = 'monthly', var = 'aice', hemisphere = 'nh')
 # cesm_aice.spatial_average(lat_bounds = [80, 89], lon_bounds = [-179, 179])

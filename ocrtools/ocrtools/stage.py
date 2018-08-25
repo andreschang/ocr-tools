@@ -14,13 +14,13 @@ import errno
 from datetime import datetime
 from netCDF4 import Dataset, num2date
 
-class stage(object):
+ndivs = {'daily': 365, 'monthly':12}
+cice_vars = ['aice', 'hi', 'flwdn', 'fswdn']
+cam_vars = ['TS', 'PRECT']
+now = datetime.now()
+scratchId = now.strftime("%Y%m%d%H%M")
 
-  ndivs = {'daily': 365, 'monthly':12}
-  cice_vars = ['aice', 'hi', 'flwdn', 'fswdn']
-  cam_vars = ['TS', 'PRECT']
-  now = datetime.now()
-  scratchId = now.strftime("%Y%m%d%H%M")
+class stage(object):
   
   def __init__(self, preset = 'andres_local', time_as = 'sequence'):
 
@@ -66,6 +66,12 @@ class stage(object):
       self.directories = {"cesm-raw": "data/raw", "cesm-reformatted": "data/reformatted", \
       "other-reformatted": "data/reformatted", "scratch": "data/scratch", "plot":"test_plots", \
       "csv": "data/streams"}
+      self.subfolders = {"cesm-raw": [], "cesm-reformatted": [], "other-reformatted": [], "plot": [],\
+       "scratch": []}
+    elif preset == 'default':
+      self.directories = None
+      self.subfolders = {"cesm-raw": [], "cesm-reformatted": [], "other-reformatted": [], "plot": [],\
+       "scratch": []}
     self.naming = {"cesm-reformatted": ["var_name", "dt", "mem", "time_slice"], \
     "other-reformatted": ["var_name", "dt", "time_slice"], "spatial_average": ["var_name", \
     "dt", "time_slice", "mean", "scratchId"], "cesm_report": ["var_name", "dt", "mem"], \

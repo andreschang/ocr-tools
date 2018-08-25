@@ -13,22 +13,24 @@ import os, os.path
 import errno
 from datetime import datetime
 from netCDF4 import Dataset, num2date
+import ocrtools.stage as st
+
+ndivs = {'daily': 365, 'monthly':12}
+cice_vars = ['aice', 'hi', 'flwdn', 'fswdn']
+cam_vars = ['TS', 'PRECT']
+now = datetime.now()
+scratchId = now.strftime("%Y%m%d%H%M")
 
 class query(object):
 
-  ndivs = {'daily': 365, 'monthly':12}
-  cice_vars = ['aice', 'hi', 'flwdn', 'fswdn']
-  cam_vars = ['TS', 'PRECT']
-  now = datetime.now()
-  scratchId = now.strftime("%Y%m%d%H%M")
+  stage = st(preset = 'default', time_as = 'date')
   
-  def __init__(self, stage = None, verbose = True, **kwargs):
+  def __init__(self, verbose = True, **kwargs):
     """
     Initializes a query. This is the core analysis feature of ocrtools.
     Should always be followed by set_params function
     
     Args:
-    * stage (stage class object) [optional]: see stage.py for documentation
     * verbose (bool)
 
     Kwargs:
@@ -38,6 +40,7 @@ class query(object):
     """
 
     self.verbose = verbose
+
     try:
       self.file = [kwargs["file"]]
     except:
@@ -46,27 +49,6 @@ class query(object):
       self.src = kwargs["src"]
     except:
       pass
-    try:
-      self.directories = stage.directories
-    except:
-      self.directories = {"cesm-raw": "", "cesm-reformatted" : "", "other-reformatted": "", \
-      "scratch": "", "plot": "", "csv": ""}
-    try:
-      self.subfolders = stage.subfolders
-    except:
-      self.subfolders = {"cesm-raw": "", "cesm-reformatted" : "", "other-reformatted": "", \
-      "scratch": "", "plot": "", "csv": ""}
-    try:
-      self.naming = stage.naming
-    except:
-      self.naming = {"cesm-reformatted": ["var_name", "dt", "mem", "time_slice"], \
-    "other-reformatted": ["var_name", "dt", "time_slice"], "spatial-average": ["var_name", \
-    "dt", "yr_range", "mean", "scratchId"], "cesm-report": ["var_name", "dt", "mem"], \
-    "other-report": ["var_name", "dt"]}
-    try:
-      self.time_as = stage.time_as
-    except:
-      self.time_as = "date"
     try:
       self.base_yr = stage.base_yr
     except:
@@ -688,7 +670,7 @@ class query(object):
     else:
       folder_type = 'other-reformatted'
 
-    if "yr_range" in self.subfolders[folder_type]:
+    if "yr_range" in self.stage.subfolders[folder_type]:
       yr_range = str(self.yr0)+'-'+str(self.yrf)
       ideal_folder = self.folder_path(folder_type)
       end_index = ideal_folder.find(yr_range)
@@ -1093,7 +1075,7 @@ class query(object):
       directory type
     """
 
-    if self.directories != None:
+    if self.stage.directories != None:
 
       subs = {"dt": self.dt, "var_name": self.var_name, "proc": "proc", \
       "tseries": "teseries", "src_var_name": self.src_var_name}
@@ -1111,11 +1093,11 @@ class query(object):
         if self.var_name in cice_vars:
           subs["hemisphere"] = self.hemisphere
 
-      subfolders = [subs[n] for n in self.subfolders[directory]]
-      fpath = '/'.join(([self.directories[directory]]+subfolders))+'/'
+      subfolders = [subs[n] for n in self.stage.subfolders[directory]]
+      fpath = '/'.join(([self.stage.directories[directory]]+subfolders))+'/'
       return fpath
     else:
-      return ''
+      return os.getcwd()
 
   def outfile(self, mode, custom_tag = "", **kwargs):
     """
@@ -1141,9 +1123,9 @@ class query(object):
 
     if ((mode == 'reduce') or (mode == 'report')):
       if mode == 'reduce':
-        if self.time_as == 'sequence':
+        if self.stage.time_as == 'sequence':
           subs["time_slice"] = "base"+str(self.base_yr)+"."+ str(kwargs["div_since_base_yr"])
-        elif self.time_as == 'date':
+        elif self.stage.time_as == 'date':
           if self.dt == 'monthly':
             subs["time_slice"] = '{:04d}'.format(kwargs["fYr0"]) + '{:02d}'.format(kwargs["fDiv0"]) + \
             '-' + '{:04d}'.format(kwargs["fYrF"]) + '{:02d}'.format(kwargs["fDivF"])
@@ -1164,7 +1146,7 @@ class query(object):
       subs["time_slice"] =str(self.yr0)+'-'+str(self.yrf)
       name_type = 'spatial_average'
       if self.src == 'cesm':
-        self.naming[name_type].insert(2, 'mem')
+        self.stage.naming[name_type].insert(2, 'mem')
         subs["mem"] = 'm'+'{:03d}'.format(self.mem)
 
       if mode == 'spatial_average-plot':
@@ -1173,9 +1155,8 @@ class query(object):
         folder_type = 'csv'
 
 
-    outfile_name = '.'.join([subs[seg] for seg in self.naming[name_type]]+custom_tag+[exts[mode]])
+    outfile_name = '.'.join([subs[seg] for seg in self.stage.naming[name_type]]+custom_tag+[exts[mode]])
     outfile_folder = self.folder_path(folder_type)
-    self.mkdir_p(outfile_folder)
 
     return outfile_folder+outfile_name
 
