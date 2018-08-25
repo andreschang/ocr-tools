@@ -69,9 +69,9 @@ To take full advantage of ocrtools organizational features, we give the query cl
 which specifies file directory structure and naming conventions.
 """
 
-import ocrtools.stage as st
-demo = st(preset = 'demo', time_as = 'date')
-query.stage = demo
+# import ocrtools.stage as st
+# demo = st(preset = 'demo', time_as = 'date')
+# query.stage = demo
 
 # print("\nCESM ANALYSIS")
 # cesm_aice = query(src = 'cesm')
@@ -81,6 +81,6 @@ query.stage = demo
 """
 Note that we didn't need to type in the filepath because ocrtools was able to construct
 the raw filename automatically based on src = 'cesm'. It also knows which folders to find the data in
-and where to save outputs based on the stage.
+and where to save outputs based on the stage preset. 
 """
 
