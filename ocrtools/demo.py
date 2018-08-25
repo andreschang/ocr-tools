@@ -35,17 +35,17 @@ Let's find out more about the 'air' var.
 Uncomment the hashed lines to keep going!
 """
 
-# mystery_file.first_look(var = 'air')
+mystery_file.first_look(var = 'air')
 
 """
-Still quite a few unknowns but we keep on chugging. 
+Still quite a few unknowns but we keep on moving. 
 The set_params() function is interactive and provides us with all kinds
 of helpful feedback. I wonder if we can learn about air temperature in NYC...
-Let's make a new query object for that.
+Let's make a new pointer to the query instance called nyc_temp
 """
 
-# nyc_temp = mystery_file
-# nyc_temp.set_params()
+nyc_temp = mystery_file
+nyc_temp.set_params()
 
 
 """
