@@ -35,7 +35,7 @@ Let's find out more about the 'air' var.
 Uncomment the hashed lines to keep going!
 """
 
-mystery_file.first_look(var = 'air')
+# mystery_file.first_look(var = 'air')
 
 """
 Still quite a few unknowns but we keep on moving. 
@@ -74,7 +74,7 @@ ocr-tools is well-tuned to CESM data, so a lot of the parameters are filled auto
 In fact, if you know the variable you're looking for, all you need to enter is the year-range.
 """
 
-print("\nCESM ANALYSIS")
-cesm_aice = query(stage = demo, src = 'cesm')
-cesm_aice.set_params(yr0 = 1980, yrf = 2050, mem = 2, dt = 'monthly', var = 'aice', hemisphere = 'nh')
-cesm_aice.spatial_average(lat_bounds = [80, 89], lon_bounds = [-179, 179])
+# print("\nCESM ANALYSIS")
+# cesm_aice = query(stage = demo, src = 'cesm')
+# cesm_aice.set_params(yr0 = 1980, yrf = 2050, mem = 2, dt = 'monthly', var = 'aice', hemisphere = 'nh')
+# cesm_aice.spatial_average(lat_bounds = [80, 89], lon_bounds = [-179, 179])
