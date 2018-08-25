@@ -44,8 +44,8 @@ of helpful feedback. I wonder if we can learn about air temperature in NYC...
 Let's make a new pointer to the query instance called nyc_temp
 """
 
-nyc_temp = mystery_file
-nyc_temp.set_params()
+# nyc_temp = mystery_file
+# nyc_temp.set_params()
 
 
 """
@@ -74,7 +74,7 @@ ocr-tools is well-tuned to CESM data, so a lot of the parameters are filled auto
 In fact, if you know the variable you're looking for, all you need to enter is the year-range.
 """
 
-# print("\nCESM ANALYSIS")
-# cesm_aice = query(stage = demo, src = 'cesm')
-# cesm_aice.set_params(yr0 = 1980, yrf = 2050, mem = 2, dt = 'monthly', var = 'aice', hemisphere = 'nh')
-# cesm_aice.spatial_average(lat_bounds = [80, 89], lon_bounds = [-179, 179])
+print("\nCESM ANALYSIS")
+cesm_aice = query(stage = demo, src = 'cesm')
+cesm_aice.set_params(yr0 = 1980, yrf = 2050, mem = 2, dt = 'monthly', var = 'aice', hemisphere = 'nh')
+cesm_aice.spatial_average(lat_bounds = [80, 89], lon_bounds = [-179, 179])
