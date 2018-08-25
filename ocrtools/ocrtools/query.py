@@ -78,10 +78,27 @@ class query(object):
     """
     Slices large datasets into manageable pieces that can later be accessed
     to save time and memory
+    
+    Kwargs:
+    * yr0 (int) [optional]: First year that will be used to make chunked data
+      files
+    * yrf (int) [optional]: Last year to be used for chunked data files
+    * custom_tags (str) [optional]: String added to output filenames
+    * print_report (bool) [optional]: If True, adds a report with conversion
+      info to the reduced data directory
+    * add_to_report (str) [optional]: Text to be added to the report
     """
+    try:
+      self.yr0 = kwargs["yr0"]
+    except:
+      pass
+    try:
+      self.yrf = kwargs["yrf"]
+    except:
+      pass
 
     custom_tags, print_report, add_to_report = self.assign_reporting_vars(kwargs)
-    ts_var, offset = self.timesync(kwargs)
+    ts_var, offset = self.timesync()
 
     print(ts_var.shape)
     report, report_tag = self.reduce_report()
@@ -170,7 +187,7 @@ class query(object):
 
   def spatial_average(self, lat_bounds = [-89., 89.], lon_bounds = [-179., 179.], lon_convert = True, output = 'plot', **kwargs):
     """
-    Calculates the weighted average of a 3-dimensional variable (2D space and time)
+    Calculates the weighted average of a 3-dimensional variable (2D space plus time)
     and outputs a graph or list of the timeseries. Must be run after set_params
 
     Args:
@@ -183,10 +200,15 @@ class query(object):
       range by default
     * output (str) [optional]: output timeseries as a 'plot', 'csv', or 'list'. Plot and csv are
       saved as specified by the stage. List does not save external to python script.
+
+    Kwargs:
+    * custom_tags (str) [optional]: String added to output filenames
+    * print_report (bool) [optional]: If True, get_latlon_indices() will output a map
+      off data points corresponding to the spatial average
     """
 
     custom_tags, print_report, add_to_report = self.assign_reporting_vars(kwargs)
-    ts_var, offset = self.timesync(kwargs)
+    ts_var, offset = self.timesync()
     ts_var = ts_var[:self.nt]
     print(ts_var.shape)
     self.function = 'spatial_average'
@@ -265,8 +287,9 @@ class query(object):
     as kwargs. See below
 
     Kwargs:
-    * src (str) [optional]: source of raw data file. Overrides any src set in query init. 
-      If src has not been set (or src is not recognized), src is treated as 'unknown'
+    * src (str) [optional]: source of raw data file. Overrides any src set in query
+      init. If src has not been set at all (or src is not recognized), src is 
+      treated as 'unknown'
 
     Kwargs (src = 'unknown'):
     * file (str) [optional]: overrides any filepath set in query init. If both left
@@ -603,6 +626,10 @@ class query(object):
   ###################################
 
   def extract_data(self):
+    """
+    Binds data to query class attributes once
+    params have been set
+    """
     
     ## 1. LOAD DATA
     start_index = 0
@@ -650,6 +677,11 @@ class query(object):
     self.f_open = None
 
   def grab_reduced_data(self):
+    """
+    Checks to see if climate data has been chunked by reduce_data
+    for the query time period under study. If so, ocrtools will use
+    these data files to save time and memory
+    """
 
     if self.src == 'cesm':
       folder_type = 'cesm-reformatted'
@@ -683,10 +715,27 @@ class query(object):
       return False
 
   def get_latlon_indices(self, lat_bounds = [-89., 89.], lon_bounds = [-179., 179.], \
-    lon_bound_convert = True, data_wrap_lon = 0, print_report = True, directory = 'scratch'):
-    ## returns lists of indices in area bounded by
-    ## lat and lon bounds
-    ##
+    lon_bound_convert = True, data_wrap_lon = 0., print_report = True, directory = 'scratch'):
+    """
+    Returns a tuple of indice lists for area bounded by lat and lon bounds.
+    If print_report is True, the function will also produce a map
+    of the data points used for reference
+
+    Args:
+    * lat_bounds (list) [optional]: 2-item list of lower and upper latitude bounds
+    * lon_bounds (list) [optional]: 2-item list of longitude bounds (use '-' for longitudes
+      west of the prime meridian and positive for east [-180 to 180] OR set values in the range
+      [0-360] and set lon_convert to FALSE)
+    * lon_convert (bool) [optional]: most climate datasets (perhaps not all) use longitude
+      between 0-360, instead of the more intuitive -180 to 180. This will convert the longitudinal
+      range by default
+    * data_wrap_lon (float) [optional]: The longitude value where data "wraps" around the globe.
+      For 0-360 datasets (0 at prime meridian), this would be 0 or 360 (equivalent)
+    * print_report (bool) [optional]: if True, function draws a map of data points and saves it
+      in the specified directory
+    * directory (str) [optional]: Stage directory where plot is saved
+
+    """
 
     resubmit = False
     nsubmit = 1
@@ -698,9 +747,9 @@ class query(object):
         print("New lon bounds: "+",".join(map(str, lon_bounds)))
 
     if lon_bounds[0] > lon_bounds[1]:
-      if ((data_wrap_lon == 0) or (data_wrap_lon == 360)):
+      if ((data_wrap_lon == 0.) or (data_wrap_lon == 360.)):
         wrap_points = [360., 0.]
-      elif ((data_wrap_lon == -180) or (data_wrap_lon == 180)):
+      elif ((data_wrap_lon == -180.) or (data_wrap_lon == 180.)):
         wrap_points = [180., -180.]
       resubmit = True
       nsubmit = 2
@@ -778,9 +827,9 @@ class query(object):
     return lat_indices, lon_indices
 
   def setup_axes(self):
-    ## reorders var axes so that time axis = 0
-    ## returns var, an ordered list of dimensions,
-    ## and axis of each independent variable
+    """
+    Reorders variable axes so that time axis is first
+    """
 
     if self.axes['time'] > 0:
       varF = np.moveaxis(self.var, self.axes['time'], 0)
@@ -799,6 +848,10 @@ class query(object):
       self.axes['level'] = False
 
   def make_curv_grid(self):
+    """
+    Returns a curvilinear grid from lat(i,j) and lon(i,j) pairs.
+    """
+
     ni = self.lat0.shape[0]
     nj = self.lat0.shape[1]
     curv_grid = np.zeros((ni, nj, 2))
@@ -809,12 +862,25 @@ class query(object):
 
     return curv_grid
 
-  def timesync(self, kwargs0):
+  def timesync(self, **kwargs):
+    """
+    Returns a tuple of the main variable array starting from yr0
+    and the offset index where the variable has been sliced
+
+    Kwargs:
+    * yr0 (int) [optional]: If yr0 has already been assigned to the query
+      instance, yr0 kwarg will be ignored. If not, timesync() will look for
+      a kwarg. If not specified, timesync() will use data_yr0 as yr0
+    * yrf (int) [optional]: If yrf has already been assigned, yrf kwarg 
+      will be ignores. If no yrf specified here or elsewhere, yrf set to None
+      and ocrtools will generally just work with yr0 to the end of the datafile
+    """
+
     try:
       self.yr0
     except AttributeError:
       try:
-        self.yr0 = kwargs0['yr0']
+        self.yr0 = kwargs['yr0']
       except KeyError:
         self.yr0 = self.data_yr0[0]
         print(self.yr0)
@@ -822,7 +888,7 @@ class query(object):
       self.yrf
     except AttributeError:
       try:
-        self.yrf = kwargs0['yrf']
+        self.yrf = kwargs['yrf']
       except KeyError:
         self.yrf = None
 
