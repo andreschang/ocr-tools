@@ -315,11 +315,10 @@ class query(object):
     * level_name (str) [optional]: only needed for 4D data (ex. space, time, and depth
       like atmospheric or ocean level). If left blank and data is 4D, will autofill or
       prompt user to input interactively
-    * yr0 (int) [optional]: calendar year 0 examined by query. Can be set later with
-      set_yr0() or if never specified, query will set yr0 = data_yr0
-    * yrf (int) [optional]: calendar year F (inclusive) examined by query. Can be set 
-      later with set_yrf or if never specified, query will set yrf as the final year 
-      of data
+    * yr0 (int) [optional]: calendar year 0 examined by query. If never specified, 
+      query will set yr0 = data_yr0
+    * yrf (int) [optional]: calendar year F (inclusive) examined by query. If never 
+      specified, query will implicitly set yrf as the final year of data
 
     Kwargs (src = 'cesm'):
     * var (str) [optional]: name of main variable examined by query. Does not 
@@ -898,8 +897,8 @@ class query(object):
       self.extract_data()
 
     self.ndiv = ndivs[self.dt]
-    print(self.yr0)
-    print(self.data_yr0)
+    # print(self.yr0)
+    # print(self.data_yr0)
     offset = (self.yr0-self.data_yr0[0])*self.ndiv
     try:
       self.nt = (self.yrf-self.yr0+1)*self.ndiv
@@ -907,17 +906,22 @@ class query(object):
       self.nt = ((self.var.shape[0]-(self.yr0-self.data_yr0[0])*self.ndiv)-1)
       self.yrf = self.yr0-1+int(self.nt/self.ndiv)
 
-    print(self.yrf)
-    print('offset')
-    print(offset)
-    print('nt')
-    print(self.nt)
+    # print(self.yrf)
+    # print('offset')
+    # print(offset)
+    # print('nt')
+    # print(self.nt)
     try:
       return self.var[offset:], offset
     except:
       raise
 
   def fill_cesm_params(self, **kwargs):
+    """
+    Autofill cesm parameters when set_params is called and src = "cesm". 
+    This includes constructing the file name (based on CESM conventions)
+    and full path based on stage.
+    """
 
     if ((self.mem != 1850) and (self.yr0 < 2006) and (self.yrf < 2006)):
       self.data_yr0, self.data_yrf = [1920], [2005]
@@ -990,31 +994,6 @@ class query(object):
       folder_path = self.folder_path("cesm-raw")
       self.file.append(folder_path+f)
       print(self.file)
-
-  def set_yr0(self, yr0):
-    """
-    Can be used to set yr0 of query object at any time
-
-    Args:
-    yr0 (int): calendar year 0 of query analysis
-    """
-
-    try:
-      self.yr0 = yr0
-    except:
-      raise
-
-  def set_yrf(self, yrf):
-    """
-    Can be used to set yrf of query object at any time
-
-    Args:
-    yrf (int): calendar year F (inclusive) of query analysis
-    """
-    try:
-      self.yrf = yrf
-    except:
-      raise
 
   ## More data-wrangling utilities ##
   ###################################
