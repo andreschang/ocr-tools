@@ -18,15 +18,13 @@ from scipy import signal
 import matplotlib.pyplot as plt
 import random as rand
 
-## Global variables
-
-ndivs = {'daily': 365, 'monthly':12}
-cice_vars = ['aice', 'hi', 'flwdn', 'fswdn']
-cam_vars = ['TS', 'PRECT']
-now = datetime.now()
-scratchId = now.strftime("%Y%m%d%H%M")
-
 class build(object):
+
+  ndivs = {'daily': 365, 'monthly':12}
+  cice_vars = ['aice', 'hi', 'flwdn', 'fswdn']
+  cam_vars = ['TS', 'PRECT']
+  now = datetime.now()
+  scratchId = now.strftime("%Y%m%d%H%M")
 
   def __init__(self, query, base_list, stage = None, verbose = True, dt = 'monthly', **kwargs):
 

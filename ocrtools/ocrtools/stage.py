@@ -14,13 +14,14 @@ import errno
 from datetime import datetime
 from netCDF4 import Dataset, num2date
 
-ndivs = {'daily': 365, 'monthly':12}
-cice_vars = ['aice', 'hi', 'flwdn', 'fswdn']
-cam_vars = ['TS', 'PRECT']
-now = datetime.now()
-scratchId = now.strftime("%Y%m%d%H%M")
-
 class stage(object):
+
+  ndivs = {'daily': 365, 'monthly':12}
+  cice_vars = ['aice', 'hi', 'flwdn', 'fswdn']
+  cam_vars = ['TS', 'PRECT']
+  now = datetime.now()
+  scratchId = now.strftime("%Y%m%d%H%M")
+  
   def __init__(self, preset = 'andres_local', time_as = 'sequence'):
 
     """
