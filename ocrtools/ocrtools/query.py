@@ -1110,7 +1110,7 @@ class query(object):
       fpath = '/'.join(([self.stage.directories[directory]]+subfolders))+'/'
       return fpath
     else:
-      return os.getcwd()
+      return os.getcwd()+'/'
 
   def outfile(self, mode, custom_tag = "", **kwargs):
     """
