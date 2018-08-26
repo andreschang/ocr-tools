@@ -103,25 +103,28 @@ class query(object):
       dataset = Dataset(f_out, 'w', format='NETCDF4_CLASSIC')
       fdims = {}
       for index, dimension in enumerate(self.dim):
-        print(dimension)
+        # print(dimension)
         fdims[dimension] = dataset.createDimension(dimension, data.shape[index])
 
       fvars = {}
 
       if len(self.lat0.shape) > 1:
-        if self.axes[self.lat_name] < self.axes[self.lon_name]:
+        if self.axes['lat'] < self.axes['lon']:
           grid_axes = ('lat', 'lon')
         else:
           grid_axes = ('lon', 'lat')
 
       for index, dimension in enumerate(self.dim):
-        if (((dimension == self.lat_name) or (dimension == self.lon_name)) and (len(self.lat0.shape) > 1)):
+        if (((dimension == self.lat_name) or (dimension == self.lon_name) or \
+          dimension == 'lat' or dimension == 'lon') and (len(self.lat0.shape) > 1)):
           fvars[dimension] = dataset.createVariable(dimension, np.float32, grid_axes)
         else:
           fvars[dimension] = dataset.createVariable(dimension, np.float32, (dimension,))
 
-      print(data.shape)
-      print(fvars)
+      if (self.verbose == True and i == 0):
+        print('Constructing new NetCDFs with shape and attributes:')
+        print(data.shape)
+        print(fvars)
 
       if self.dt == 'daily':
         fYr0, fDiv0 = '{:04d}'.format(fYr0), '{:03d}'.format(fDiv0)
@@ -137,9 +140,9 @@ class query(object):
           '\n to yr ' + str(fYrF) + ' month ' + str(fDivF))
         fvars['time'].units = 'months since '+str(self.base_yr)+'-00'
 
-      print(div_since_base_yr)
-      print(div_since_base_yr+120)
-      print(np.arange(div_since_base_yr,div_since_base_yr+120))
+      # print(div_since_base_yr)
+      # print(div_since_base_yr+120)
+      # print(np.arange(div_since_base_yr,div_since_base_yr+120))
       fvars['time'][:] = np.arange(div_since_base_yr,div_since_base_yr+120)
       fvars['lat'].units = self.units['lat']
       fvars['lon'].units = self.units['lon']
@@ -612,6 +615,9 @@ class query(object):
     Binds data to query class attributes once
     params have been set
     """
+
+    if self.verbose == True:
+      print("Running extract_data()")
     
     ## 1. LOAD DATA
     start_index = 0
@@ -626,7 +632,10 @@ class query(object):
     self.axes = {}
     self.axes['time']  = self.dim.index(self.time_name)
     self.var = self.f_open.variables[self.src_var_name][start_index:]
-    print(self.var.shape)
+    
+    if self.verbose == True:
+      print('Untrimmed var shape:')
+      print(self.var.shape)
 
     for ff in np.arange(1, len(self.file)):
       print('Concatenating netcdf '+str(ff))
@@ -634,9 +643,12 @@ class query(object):
       self.var = np.concatenate((self.var, add_f_open.variables[self.src_var_name][:]), axis = self.axes['time'])
       add_f_open.close()
 
-    print(self.var.shape)
     self.setup_axes()
     self.units = {}
+
+    if self.verbose == True:
+      print('Variable axes:')
+      print(self.axes)
 
     self.lat0 = self.f_open.variables[self.lat_name][:]
     self.lon0 = self.f_open.variables[self.lon_name][:]
@@ -693,6 +705,7 @@ class query(object):
 
           return target_ncs, start_index, end_index
         else:
+          print('Reduced data not found. Checking for raw data')
           return False
       return False
 
@@ -1154,7 +1167,6 @@ class query(object):
       elif mode == 'spatial_average-csv':
         folder_type = 'csv'
 
-
     outfile_name = '.'.join([subs[seg] for seg in self.stage.naming[name_type]]+custom_tag+[exts[mode]])
     outfile_folder = self.folder_path(folder_type)
 
@@ -1177,12 +1189,12 @@ class query(object):
       report_div0, report_divf = '{:02d}'.format(report_div00), '{:02d}'.format(report_divf00)
 
     date_time = now.strftime("%Y-%m-%d %H:%M")
-    report = '\nData reformatting executed by the OCR Tools preanalysis module, version '+version
-    report += ', on '+date_time+'. \n\nOutput '+str(nfiles) + ' files'
+    report = '\nData reformatting executed by the OCR Tools preanalysis module'
+    report += ' on '+date_time+'. \n\nOutput '+str(nfiles) + ' files'
     report += ' covering the timespan '+report_yr0+'-'+report_div0 + ' to '+ report_yrf + '-' + report_divf + '.'
     report += '\n\nMain variable - ' + self.var_name + ' - as a function of ' +  \
     ', '.join([x for x in self.dim]) + '.'
-    report_tag = ['_' +  report_yr0+ report_div0+ '-' + report_yrf+ report_divf]
+    report_tag = '_' +  report_yr0+ report_div0+ '-' + report_yrf+ report_divf
     return report, report_tag
 
   def mkdir_p(self, path):
