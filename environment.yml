@@ -1,4 +1,4 @@
-name: ocrtools_test
+name: ocrtools
 channels:
   - conda-forge
   - defaults
