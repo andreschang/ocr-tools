@@ -3,7 +3,7 @@ Open Climate Research is an ongoing project that aims to facilitate creative exp
 
 ## Installing / Getting started
 
-OCR Tools runs in Python, and it requires a few basic packages: [Matplotlib](https://matplotlib.org/), [Basemap](https://matplotlib.org/basemap/), [SciPy](https://www.scipy.org/), and [NetCDF4](http://unidata.github.io/netcdf4-python/). The packages can be installed individually using the [Anaconda Navigator](https://www.anaconda.com/distribution/) or [Canopy](https://www.enthought.com/product/canopy/) desktop applications (no command line needed). 
+OCR Tools runs in Python 3, and it requires a few basic packages: [Matplotlib](https://matplotlib.org/), [Basemap](https://matplotlib.org/basemap/), [SciPy](https://www.scipy.org/), and [NetCDF4](http://unidata.github.io/netcdf4-python/). The packages can be installed individually using the [Anaconda Navigator](https://www.anaconda.com/distribution/) or [Canopy](https://www.enthought.com/product/canopy/) desktop applications (no command line needed). 
 
 Conda users may also set up their environment through the command line by typing
 
