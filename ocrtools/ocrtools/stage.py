@@ -53,7 +53,7 @@ class stage(object):
       self.subfolders = {"cesm-raw": ['dt', 'var_name'], "cesm-reformatted": ["var_name", "yr_range"],
       "other-reformatted": ["var_name", "yr_range"], "scratch": [], "plot": ["function"]}
     elif preset == 'ucar':
-      self.directories = {"cesm-raw": "/glade/p/cesmLE/CESM-CAM5-BGC-LE", \
+      self.directories = {"cesm-raw": "/glade/p_old/cesmLE/CESM-CAM5-BGC-LE", \
       "cesm-reformatted": "/glade/p/work/andresc/OCR/reformatted/cesm", \
       "other-reformatted": "/glade/p/work/andresc/OCR/reformatted", \
       "scratch": "/glade/p/work/andresc/OCR/scratch"}
