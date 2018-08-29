@@ -16,8 +16,14 @@ from netCDF4 import Dataset, num2date
 import ocrtools.stage as st
 
 ndivs = {'daily': 365, 'monthly':12}
-cice_vars = ['aice', 'hi', 'flwdn', 'fswdn']
-cam_vars = ['TS', 'PRECT']
+cice_vars = (np.genfromtxt('var_lists/cice_vars.csv', delimiter = ',')[3,1:]).tolist()
+cam_vars = (np.genfromtxt('var_lists/cam_vars.csv', delimiter = ',')[3,1:]).tolist()
+clm_vars = (np.genfromtxt('var_lists/clm_vars.csv', delimiter = ',')[3,1:]).tolist()
+pop_vars = (np.genfromtxt('var_lists/pop_vars.csv', delimiter = ',')[3,1:]).tolist()
+print(cice_vars)
+print(cam_vars)
+print(clm_vars)
+
 now = datetime.now()
 scratchId = now.strftime("%Y%m%d%H%M")
 
@@ -341,6 +347,20 @@ class query(object):
         self.var_name = var_name0[:(len(var_name0)-2)]
       else:
         self.var_name = var_name0
+
+      if self.var_name.lower() == "rain" or self.var_name.lower() == "snow":
+        which = input("Land or ice model?")
+      elif self.var_name.lower() == "iage" or self.var_name.lower() == "uvel" or\
+       self.var_name.lower() == "vvel":
+        which = input("Ice or ocean model?")
+      else:
+
+
+
+      if which[0:3].lower() == "ice":
+        self.var_name = self.var_name.lower()
+      elif which[0:3].lower() == "oce" or which[0:3].lower() == "lan":
+        self.var_name = self.var_name.upper()
 
       try:
         self.dt = kwargs["dt"]

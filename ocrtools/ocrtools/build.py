@@ -17,12 +17,8 @@ from scipy import stats
 from scipy import signal
 import matplotlib.pyplot as plt
 import random as rand
-
-ndivs = {'daily': 365, 'monthly':12}
-cice_vars = ['aice', 'hi', 'flwdn', 'fswdn']
-cam_vars = ['TS', 'PRECT']
-now = datetime.now()
-scratchId = now.strftime("%Y%m%d%H%M")
+from stage import cice_vars, cam_vars, clm_vars, pop_vars, \
+ndivs, now, scratchId
 
 class build(object):
 
