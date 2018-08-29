@@ -17,8 +17,6 @@ from scipy import stats
 from scipy import signal
 import matplotlib.pyplot as plt
 import random as rand
-from stage import cice_vars, cam_vars, clm_vars, pop_vars, \
-ndivs, now, scratchId
 
 class build(object):
 

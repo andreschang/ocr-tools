@@ -14,30 +14,30 @@ import errno
 from datetime import datetime
 from netCDF4 import Dataset, num2date
 
-ndivs = {'daily': 365, 'monthly':12}
-
-def rcsv(fname):
-  import csv
-  with open(fname) as f:
-    reader = csv.reader(f)
-    next(reader) # skip header
-    data = [r for r in reader]
-
-  return data
-
-cice = rcsv('var_lists/cice_vars.csv')
-cice_vars = [itm[3] for itm in cice]
-cam = rcsv('var_lists/cam_vars.csv')
-cam_vars = [itm[3] for itm in cam]
-clm = rcsv('var_lists/clm_vars.csv')
-clm_vars = [itm[3] for itm in clm]
-pop = rcsv('var_lists/pop_vars.csv')
-pop_vars = [itm[3] for itm in pop]
-
-now = datetime.now()
-scratchId = now.strftime("%Y%m%d%H%M")
-
 class stage(object):
+  
+  ndivs = {'daily': 365, 'monthly':12}
+
+  def rcsv(fname):
+    import csv
+    with open(fname) as f:
+      reader = csv.reader(f)
+      next(reader) # skip header
+      data = [r for r in reader]
+
+    return data
+
+  cice = rcsv(os.path.join(os.path.dirname(__file__), 'var_lists/cice_vars.csv'))
+  cice_vars = [itm[3] for itm in cice]
+  cam = rcsv(os.path.join(os.path.dirname(__file__), 'var_lists/cam_vars.csv'))
+  cam_vars = [itm[3] for itm in cam]
+  clm = rcsv(os.path.join(os.path.dirname(__file__), 'var_lists/clm_vars.csv'))
+  clm_vars = [itm[3] for itm in clm]
+  pop = rcsv(os.path.join(os.path.dirname(__file__), 'var_lists/pop_vars.csv'))
+  pop_vars = [itm[3] for itm in pop]
+
+  now = datetime.now()
+  scratchId = now.strftime("%Y%m%d%H%M")
   
   def __init__(self, preset = 'andres_local', time_as = 'sequence'):
 
@@ -95,4 +95,5 @@ class stage(object):
     "other-report": ["var_name", "dt"]}
     self.time_as = time_as
     self.base_yr = 1920
+
 

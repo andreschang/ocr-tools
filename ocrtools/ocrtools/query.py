@@ -14,8 +14,10 @@ import errno
 from datetime import datetime
 from netCDF4 import Dataset, num2date
 import ocrtools.stage as st
-from stage import cice_vars, cam_vars, clm_vars, pop_vars, \
-ndivs, now, scratchId
+
+cice_vars, cam_vars= st.cice_vars, st.cam_vars
+clm_vars, pop_vars = st.clm_vars, st.pop_vars
+ndivs, now, scratchId = st.ndivs, st.now, st.scratchId
 
 class query(object):
 
