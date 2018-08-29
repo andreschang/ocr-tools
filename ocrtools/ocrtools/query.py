@@ -14,18 +14,8 @@ import errno
 from datetime import datetime
 from netCDF4 import Dataset, num2date
 import ocrtools.stage as st
-
-ndivs = {'daily': 365, 'monthly':12}
-cice_vars = (np.genfromtxt('var_lists/cice_vars.csv', delimiter = ',')[3,1:]).tolist()
-cam_vars = (np.genfromtxt('var_lists/cam_vars.csv', delimiter = ',')[3,1:]).tolist()
-clm_vars = (np.genfromtxt('var_lists/clm_vars.csv', delimiter = ',')[3,1:]).tolist()
-pop_vars = (np.genfromtxt('var_lists/pop_vars.csv', delimiter = ',')[3,1:]).tolist()
-print(cice_vars)
-print(cam_vars)
-print(clm_vars)
-
-now = datetime.now()
-scratchId = now.strftime("%Y%m%d%H%M")
+from stage import cice_vars, cam_vars, clm_vars, pop_vars, \
+ndivs, now, scratchId
 
 class query(object):
 
@@ -348,14 +338,26 @@ class query(object):
       else:
         self.var_name = var_name0
 
-      if self.var_name.lower() == "rain" or self.var_name.lower() == "snow":
-        which = input("Land or ice model?")
-      elif self.var_name.lower() == "iage" or self.var_name.lower() == "uvel" or\
-       self.var_name.lower() == "vvel":
-        which = input("Ice or ocean model?")
+      dup_vars = ["rain", "snow", "iage", "uvel", "vvel"]
+      if self.var_name.lower() in dup_vars:      
+        if self.var_name.lower() == "rain" or self.var_name.lower() == "snow":
+          which = input("Land or ice model?")
+        elif self.var_name.lower() == "iage" or self.var_name.lower() == "uvel" or\
+         self.var_name.lower() == "vvel":
+          which = input("Ice or ocean model?")
+        if which[0:3].lower() == "ice":
+          self.var_name = self.var_name.lower()
+        else:
+          self.var_name = self.var_name.upper()
       else:
-
-
+        var_found = False
+        for which_var in (cice_vars+cam_vars+clm_vars+pop_vars):
+          if which_var.lower() == self.var_name.lower():
+            self.var_name = which_var
+            var_found = True
+            break
+        if var_found == False:
+          raise KeyError("Variable not found in any CESM model")
 
       if which[0:3].lower() == "ice":
         self.var_name = self.var_name.lower()
@@ -976,8 +978,11 @@ class query(object):
           f_h = "h"
           f_date = str(self.data_yr0[m]) + '01-' + str(self.data_yrf[m]) + '12'
 
-      elif self.var_name in cam_vars:
-        self.cesm_grid, self.model = 'cam', 'atm'
+      elif self.var_name in cam_vars or self.var_name in clm_vars:
+        if self.var_name in cam_vars:
+          self.cesm_grid, self.model = 'cam', 'atm'
+        else:
+          self.cesm_grid, self.model = 'clm2', 'land'
         self.lon_name = 'lon'
         self.lat_name = 'lat'
         f_hem = ""
@@ -985,6 +990,21 @@ class query(object):
         self.level_name = 'lev'
         if self.dt == 'daily':
           f_h = "h1"
+          f_date = str(self.data_yr0[m]) + '0101-' + str(self.data_yrf[m]) + '1231'
+        elif self.dt == "monthly":
+          f_h = "h0"
+          f_date = str(self.data_yr0[m]) + '01-' + str(self.data_yrf[m]) + '12'
+
+      elif self.var_name in pop_vars:
+        self.cesm_grid, self.model = 'pop', 'ocn'
+        self.lon_name = 'TLON'
+        self.lat_name = 'TLAT'
+        self.cellarea_name = 'tarea'
+        f_hem = ""
+        self.src_var_name = self.var_name
+        self.level_name = 'lev'
+        if self.dt == 'daily':
+          f_h = "h.nday1"
           f_date = str(self.data_yr0[m]) + '0101-' + str(self.data_yrf[m]) + '1231'
         elif self.dt == "monthly":
           f_h = "h0"
