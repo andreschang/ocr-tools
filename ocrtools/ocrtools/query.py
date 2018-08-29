@@ -98,6 +98,9 @@ class query(object):
       f_out = self.outfile('reduce', div_since_base_yr = div_format, \
         fYr0 = fYr0, fDiv0 = fDiv0, fYrF = fYrF, fDivF = fDivF, custom_tag = custom_tag)
 
+      if(i == 0):
+        f_out_decomp = f_out.split("/")
+        self.mkdir_p("/".join(f_out_decomp[:-1]))
       dataset = Dataset(f_out, 'w', format='NETCDF4_CLASSIC')
       fdims = {}
       for index, dimension in enumerate(self.dim):
