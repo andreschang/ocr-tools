@@ -361,11 +361,6 @@ class query(object):
         if var_found == False:
           raise KeyError("Variable not found in any CESM model")
 
-      if which[0:3].lower() == "ice":
-        self.var_name = self.var_name.lower()
-      elif which[0:3].lower() == "oce" or which[0:3].lower() == "lan":
-        self.var_name = self.var_name.upper()
-
       try:
         self.dt = kwargs["dt"]
       except KeyError:
