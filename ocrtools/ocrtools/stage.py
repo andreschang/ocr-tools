@@ -15,8 +15,25 @@ from datetime import datetime
 from netCDF4 import Dataset, num2date
 
 ndivs = {'daily': 365, 'monthly':12}
-cice_vars = ['aice', 'hi', 'flwdn', 'fswdn']
-cam_vars = ['TS', 'PRECT']
+
+def rcsv(fname):
+  import csv
+  with open(fname) as f:
+    reader = csv.reader(f)
+    next(reader) # skip header
+    data = [r for r in reader]
+
+  return data
+
+cice = rcsv('var_lists/cice_vars.csv')
+cice_vars = [itm[3] for itm in cice]
+cam = rcsv('var_lists/cam_vars.csv')
+cam_vars = [itm[3] for itm in cam]
+clm = rcsv('var_lists/clm_vars.csv')
+clm_vars = [itm[3] for itm in clm]
+pop = rcsv('var_lists/pop_vars.csv')
+pop_vars = [itm[3] for itm in pop]
+
 now = datetime.now()
 scratchId = now.strftime("%Y%m%d%H%M")
 
