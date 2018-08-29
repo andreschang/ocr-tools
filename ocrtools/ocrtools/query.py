@@ -343,10 +343,10 @@ class query(object):
       dup_vars = ["rain", "snow", "iage", "uvel", "vvel"]
       if self.var_name.lower() in dup_vars:      
         if self.var_name.lower() == "rain" or self.var_name.lower() == "snow":
-          which = input("Land or ice model?")
+          which = input("Land or ice model? ")
         elif self.var_name.lower() == "iage" or self.var_name.lower() == "uvel" or\
          self.var_name.lower() == "vvel":
-          which = input("Ice or ocean model?")
+          which = input("Ice or ocean model? ")
         if which[0:3].lower() == "ice":
           self.var_name = self.var_name.lower()
         else:
