@@ -51,6 +51,10 @@ class query(object):
       self.base_yr = stage.base_yr
     except:
       self.base_yr = 1920
+    try:
+      self.fill_thresh = fill
+    except:
+      self.fill_thresh = 3e10
 
   ## Primary functions  ##
   ########################
@@ -212,7 +216,8 @@ class query(object):
 
     if len(self.lat0.shape) == 1:
       bounded_var = self.bound_var(ts_var, lat_indices, lon_indices, lat_axis = self.axes['lat'], lon_axis = self.axes['lon'])
-      mm_var = np.mean(bounded_var, axis = self.axes['lon'])
+      mm_var = np.nanmean(bounded_var, axis = self.axes['lon'])
+      print(mm_var)
 
       lat_range = [self.lat0[k] for k in lat_indices]
       wgt = self.reg_wgt(lat_range[0], lat_range[-1], len(lat_range))
@@ -225,7 +230,7 @@ class query(object):
       sum_var = 0.
       for i in range(len(lat_indices)):
         if (np.isnan(ts_var[0, lat_indices[i], lon_indices[i]]) == False and \
-          ts_var[0, lat_indices[i], lon_indices[i]]) < 3e10:
+          ts_var[0, lat_indices[i], lon_indices[i]]) < self.fill_thresh:
           sum_var += ts_var[:, lat_indices[i], lon_indices[i]]*self.cellarea0[lat_indices[i], lon_indices[i]]
           total_area += self.cellarea0[lat_indices[i], lon_indices[i]]
       # print(sum_var)
@@ -667,6 +672,7 @@ class query(object):
 
     self.setup_axes()
     self.units = {}
+    self.var = self.nan_if(self.var, self.fill_thresh)
 
     if self.verbose == True:
       print('Variable axes:')
@@ -760,13 +766,13 @@ class query(object):
     if lon_bound_convert == True:
       lon_bounds = [(bound+360. if bound < 0 else bound) for bound in lon_bounds]
       if self.verbose == True:
-        print("Converting lon bounds from 180W-180E to 0-360")
+        print("Converting lon bounds from 180W-180E (user) to 0-360 (source)")
         print("New lon bounds: "+",".join(map(str, lon_bounds)))
 
     if lon_bounds[0] > lon_bounds[1]:
-      if ((data_wrap_lon == 0.) or (data_wrap_lon == 360.)):
+      if ((data_wrap_lon == 0) or (data_wrap_lon == 360)):
         wrap_points = [360., 0.]
-      elif ((data_wrap_lon == -180.) or (data_wrap_lon == 180.)):
+      elif ((data_wrap_lon == -180) or (data_wrap_lon == 180)):
         wrap_points = [180., -180.]
       resubmit = True
       nsubmit = 2
@@ -1302,4 +1308,7 @@ class query(object):
       self.src_var_name = self.var_name
     except:
       pass
+
+  def nan_if(self, arr, value):
+    return np.where(arr > value, np.nan, arr)
 
