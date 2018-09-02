@@ -196,6 +196,7 @@ class query(object):
     * custom_tag (str) [optional]: String added to output filenames
     * print_report (bool) [optional]: If True, get_latlon_indices() will output a map
       off data points corresponding to the spatial average
+    * color (str) [optional]: Line color in plot
     """
 
     custom_tag, print_report, add_to_report = self.assign_reporting_vars(kwargs)
@@ -246,7 +247,10 @@ class query(object):
     if output == 'plot':
       import matplotlib.pyplot as plt
       print(xtime.shape, len(mvar))
-      plt.plot(xtime, mvar)
+      try:
+        plt.plot(xtime, mvar, color = kwargs['color'])
+      except:
+        plt.plot(xtime, mvar)
       f1 = self.outfile('spatial_average-plot', custom_tag = custom_tag)
       plt.savefig(f1, dpi = 200)
       if print_report == True:
