@@ -727,19 +727,35 @@ class query(object):
 
       subdirs = self.get_subs(f0)
       yr_ranges = [[int(x.split('-')[0]), int(x.split('-')[1])] for x in subdirs]
+      print(subdirs)
+      print(yr_ranges)
 
       for span in yr_ranges:
         if ((span[0] <= self.yr0) and (span[1]-1 >= self.yrf)):
           target_folder = f0+('-').join(map(str, span))
-          print('Fetching reduced data from '+target_folder)
           rf_yr0 = span[0]
           nstartfile, start_index = divmod((self.yr0-rf_yr0)*ndivs[self.dt], 120)
           endfile, end_index = divmod((self.yrf-rf_yr0+1)*ndivs[self.dt], 120)
           all_ncs = self.get_ncs(target_folder)
-          target_ncs = [target_folder+'/'+file for file in all_ncs[nstartfile:endfile+1]]
-          self.simple_params()
+          if self.mem:
+            found = False
+            for w in range(len(all_ncs)):
+              if ('m'+str(self.mem)+'.' in all_ncs[w]) or ('m' + '{:03d}'.format(self.mem)+'.' in all_ncs[w]):
+                if found == False:
+                  nstartfile, endfile = nstartfile+w, endfile+w
+                found = True
+          else:
+            found = True
 
-          return target_ncs, start_index, end_index
+          if found == True:
+            print('Fetching reduced data from '+target_folder)
+            print('Files: '+all_ncs[nstartfile]+' ... '+all_ncs[endfile])
+            target_ncs = [target_folder+'/'+file for file in all_ncs[nstartfile:endfile+1]]
+            self.simple_params()
+            return target_ncs, start_index, end_index
+          else:
+            print('Reduced data not found. Checking for raw data')
+            return False
         else:
           print('Reduced data not found. Checking for raw data')
           return False
