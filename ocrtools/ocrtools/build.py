@@ -17,6 +17,8 @@ from scipy import stats
 from scipy import signal
 import matplotlib.pyplot as plt
 import random as rand
+import ocrtools.stage as st
+ndivs = st.ndivs
 
 class build(object):
 
@@ -298,6 +300,13 @@ class build(object):
         snap_c = snap_c0/(snap/100.)
 
       step_i = (1-snap_c)*list0_base[i+1]+(snap_c)*step_i
+
+      if var_min != None:
+        if step_i < var_min:
+          step_i = var_min
+      if var_max != None:
+        if step_i > var_max:
+          step_i = var_max
 
       ## do some displacement here
       new_list.append(step_i)
