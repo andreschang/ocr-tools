@@ -727,8 +727,6 @@ class query(object):
 
       subdirs = self.get_subs(f0)
       yr_ranges = [[int(x.split('-')[0]), int(x.split('-')[1])] for x in subdirs]
-      print(subdirs)
-      print(yr_ranges)
 
       for span in yr_ranges:
         if ((span[0] <= self.yr0) and (span[1]-1 >= self.yrf)):
@@ -754,11 +752,10 @@ class query(object):
             self.simple_params()
             return target_ncs, start_index, end_index
           else:
-            print('Reduced data not found. Checking for raw data')
-            return False
+            pass
         else:
-          print('Reduced data not found. Checking for raw data')
-          return False
+          pass
+      print('Reduced data not found. Checking for raw data')
       return False
 
   def get_latlon_indices(self, lat_bounds = [-89., 89.], lon_bounds = [-179., 179.], \
