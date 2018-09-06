@@ -210,10 +210,10 @@ class query(object):
     ## Only works with 2d variables currently
     ##
     if output == 'list':
-      lat_indices, lon_indices = self.get_latlon_indices(lat_bounds, lon_bounds, print_report = False)
+      lat_indices, lon_indices = self.get_latlon_indices(lat_bounds, lon_bounds, print_report = False, lon_convert = lon_convert)
     else:
       lat_indices, lon_indices = self.get_latlon_indices(lat_bounds, lon_bounds, print_report = print_report, \
-      directory = output)
+      directory = output, lon_convert = lon_convert)
 
     if len(self.lat0.shape) == 1:
       bounded_var = self.bound_var(ts_var, lat_indices, lon_indices, lat_axis = self.axes['lat'], lon_axis = self.axes['lon'])
@@ -759,7 +759,7 @@ class query(object):
       return False
 
   def get_latlon_indices(self, lat_bounds = [-89., 89.], lon_bounds = [-179., 179.], \
-    lon_bound_convert = True, data_wrap_lon = 0., print_report = True, directory = 'scratch'):
+    lon_convert = True, data_wrap_lon = 0., print_report = True, directory = 'scratch'):
     """
     Returns a tuple of indice lists for area bounded by lat and lon bounds.
     If print_report is True, the function will also produce a map
@@ -784,7 +784,7 @@ class query(object):
     resubmit = False
     nsubmit = 1
     mlon_bounds = lon_bounds
-    if lon_bound_convert == True:
+    if lon_convert == True:
       lon_bounds = [(bound+360. if bound < 0 else bound) for bound in lon_bounds]
       if self.verbose == True:
         print("Converting lon bounds from 180W-180E (user) to 0-360 (source)")
@@ -1057,6 +1057,50 @@ class query(object):
       folder_path = self.folder_path("cesm-raw")
       self.file.append(folder_path+f)
       print(self.file)
+
+  def get_area(self, lat_bounds = [-89., 89.], lon_bounds = [-179., 179.], lon_convert = True):
+    """
+    Returns bounded area in m^2
+
+    Args:
+    * lat_bounds (list) [optional]: 2-item list of lower and upper latitude bounds
+    * lon_bounds (list) [optional]: 2-item list of longitude bounds (use '-' for longitudes
+      west of the prime meridian and positive for east [-180 to 180] OR set values in the range
+      [0-360] and set lon_convert to FALSE)
+    * lon_convert (bool) [optional]: most climate datasets (perhaps not all) use longitude
+      between 0-360, instead of the more intuitive -180 to 180. This will convert the longitudinal
+      range by default
+    """
+    
+    lat_indices, lon_indices = self.get_latlon_indices(lat_bounds, lon_bounds, print_report = False, \
+      lon_convert = lon_convert)
+
+    def reproject(latitude, longitude):
+      """Returns the x & y coordinates in meters using a sinusoidal projection"""
+      earth_radius = 6371009 # in meters
+      lat_dist = np.pi * earth_radius / 180.0
+      y = [lat * lat_dist for lat in latitude]
+      x = [lon * lat_dist * np.cos(np.radians(lat)) 
+                  for lat, lon in zip(latitude, longitude)]
+      return x, y
+
+    def area_of_polygon(x, y):
+      """Calculates the area of an arbitrary polygon given its verticies"""
+      area = 0.0
+      for i in range(-1, len(x)-1):
+          area += x[i] * (y[i+1] - y[i-1])
+      return abs(area) / 2.0
+
+    if len(self.lat0.shape) == 1:
+      lats = [self.lat0[yy] for yy in lat_indices]
+      lons = [self.lon0[xx] for xx in lon_indices]
+
+    elif len(self.lat0.shape) == 2:  
+      lats = [self.lat0[lat_indices[i], lon_indices[i]] for i in range(len(lat_indices))]
+      lons = [self.lon0[lat_indices[i], lon_indices[i]] for i in range(len(lat_indices))]
+
+    x,y = reproject(lats, lons)
+    return area_of_polygon(x, y)
 
   ## More data-wrangling utilities ##
   ###################################
