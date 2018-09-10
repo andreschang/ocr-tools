@@ -22,7 +22,26 @@ ndivs = st.ndivs
 
 class build(object):
 
-  def __init__(self, query, base_list, stage = None, verbose = True, dt = 'monthly', **kwargs):
+  def __init__(self, query, base_list, verbose = True, dt = 'monthly', **kwargs):
+    """
+    Initializes a build object that can be used to modify and/or
+    interpolate between existing climate simulation data products
+
+    Args:
+    * query (object): query object with attributes that are shared by build object
+    * base_list (list): data product (usually timeseries) that is used as a basis
+    for newly developed products
+
+    Kwargs:
+    * verbose (Boolean): print extra info for debugging etc.
+    * dt (str): specify whether input data is monthly or daily
+    * stage (str) [optional]: specify a stage for class to use. Otherwise, it
+    will be set based on that of input query object
+    """
+
+    ## Modify the input query class for naming
+    self.query = query
+    self.query.src = 'build'
 
     self.base_list = base_list
     self.verbose = verbose
@@ -37,28 +56,34 @@ class build(object):
         print("Could not autofill dt. Please specify dt in build object")
 
     try:
-      self.directories = stage.directories
+      self.stage = kwargs['stage']
+    except:
+      try:
+        self.stage = self.query.stage
+
+    try:
+      self.directories = self.stage.directories
     except:
       self.directories = {"cesm-raw": "", "cesm-reformatted" : "", "other-reformatted": "", \
       "scratch": "", "plot": "", "csv": ""}
     try:
-      self.subfolders = stage.subfolders
+      self.subfolders = self.stage.subfolders
     except:
       self.subfolders = {"cesm-raw": "", "cesm-reformatted" : "", "other-reformatted": "", \
       "scratch": "", "plot": "", "csv": ""}
     try:
-      self.naming = stage.naming
+      self.naming = self.stage.naming
     except:
       self.naming = {"cesm-reformatted": ["var_name", "dt", "mem", "time_slice"], \
     "other-reformatted": ["var_name", "dt", "time_slice"], "spatial-average": ["var_name", \
     "dt", "yr_range", "mean", "scratchId"], "cesm-report": ["var_name", "dt", "mem"], \
     "other-report": ["var_name", "dt"]}
     try:
-      self.time_as = stage.time_as
+      self.time_as = self.stage.time_as
     except:
       self.time_as = "date"
     try:
-      self.base_yr = stage.base_yr
+      self.base_yr = self.stage.base_yr
     except:
       self.base_yr = 1920
     try:
@@ -66,11 +91,17 @@ class build(object):
     except:
       pass
 
-    ## Modify the input query class for naming
-    self.query = query
-    self.query.src = 'build'
-
   def annual_cycle(self, **kwargs):
+    """
+    Takes input data product and returns average annual cycle (i.e. climatology)
+
+    Kwargs:
+    list (str) [optional]: which list to use for calculating annual cycle
+    combine_steps (int) [optional]: whether to use the avaerage of multiple
+    timesteps to produce annual cycle. Ex. climatology where average of every
+    three days is used, instead of every day. Usually introduces some weird distortion
+    """
+
     try:
       list0 = kwargs['list']
     except:
@@ -83,6 +114,8 @@ class build(object):
       except:
         combine_steps = 1
 
+    ## List of each starting data index (ind0) to be used for annual cycle
+    ## If combine_steps = 1, then this is every div. If = 2, every other div..
     all_step0 = np.arange(0, self.ndiv, combine_steps)
     pad_list = np.concatenate((list0, list0[-self.ndiv:]))
     all_vals, average_steps, div_average_steps = [], [], []
@@ -336,15 +369,41 @@ class build(object):
 
 
   def get_build_indices(self, list0, div, combine_steps):
+    """
+    Returns index lists - ind0, indf, and all_ind - and nstep.
+    ind0 is the first div under consideration and indf is the next
+    regular step, taken from the last year. all_ind includes all the
+    "next steps" from every year in list (ex. if ind0 is Jan 1990,
+    indf is February 1995, and all_ind is Feb 1990-1995)
+
+    Args:
+    * list0 (list): Input list (only used for length assessments)
+    * div (int): Specify which div in the year under consideration
+     (0-364 or 0-11)
+    * combine_steps (int): Specify number of steps to include in each
+    returned list, ind0, indf, and all_ind. Introduces some distortion
+
+    """
+
+    ## get num of full years and remainder divs in full list
     yrf, yrf_div = divmod(len(list0), self.ndiv)
 
+    ## get set of indexes for data to be averaged
     ind0 = np.arange(div, div+combine_steps)
-    ## -1 or -2 ???
-    divf = (yrf-1)*self.ndiv+(div+combine_steps)
-    # divf = (yrf-1)*self.ndiv+(div+combine_steps)
-    if yrf_div >= (div+2*combine_steps):
-      divf = divf+self.ndiv
-      # print(divf)
+
+    divf_ind0_plus_one = (yrf)*self.ndiv+(div+combine_steps)
+
+    ## make sure that all divf units (based on combine_step)
+    ## would be captured by the list
+    if divf_ind0_plus_one+(combine_steps-1)+1 <= len(list0):
+      divf = (yrf)*self.ndiv+(div+combine_steps)
+    else:
+      divf = (yrf-1)*self.ndiv+(div+combine_steps)
+
+    # if yrf_div >= (div+2*combine_steps):
+    #   divf = divf+self.ndiv
+    #   # print(divf)
+
     indf = np.arange(divf, divf+combine_steps)
     nstep = int((divf-div-1)/self.ndiv)
     # print(nstep)
