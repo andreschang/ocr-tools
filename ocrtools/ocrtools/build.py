@@ -37,6 +37,8 @@ class build(object):
     * dt (str): specify whether input data is monthly or daily
     * stage (str) [optional]: specify a stage for class to use. Otherwise, it
     will be set based on that of input query object
+    * combine_steps (int) [optional]: how many consecutive datapoints should be used
+    for the analysis (ex. January 1-5, combine_steps = 5)
     """
 
     ## Modify the input query class for naming
@@ -58,9 +60,7 @@ class build(object):
     try:
       self.stage = kwargs['stage']
     except:
-      try:
-        self.stage = self.query.stage
-
+      self.stage = self.query.stage
     try:
       self.directories = self.stage.directories
     except:
@@ -93,13 +93,12 @@ class build(object):
 
   def annual_cycle(self, **kwargs):
     """
-    Takes input data product and returns average annual cycle (i.e. climatology)
+    Returns average annual cycle (i.e. climatology) of input list
 
     Kwargs:
     list (str) [optional]: which list to use for calculating annual cycle
-    combine_steps (int) [optional]: whether to use the avaerage of multiple
-    timesteps to produce annual cycle. Ex. climatology where average of every
-    three days is used, instead of every day. Usually introduces some weird distortion
+    combine_steps (int) [optional]: how many consecutive datapoints should be used
+    for the analysis (ex. January 1-5, combine_steps = 5)
     """
 
     try:
@@ -141,11 +140,22 @@ class build(object):
       step_i = div_average_steps[which_step]/(combine_steps)+new_list[i]
       new_list.append(step_i)
 
-    print('Annual cycle of length '+str(len(new_list))+' calculated from list with combine_steps = '+str(combine_steps))
+    if self.verbose == True:
+      print('Annual cycle of length '+str(len(new_list))+' calculated from list with combine_steps = '+str(combine_steps))
 
     return new_list
 
   def get_variance(self, **kwargs):
+    """
+    Returns step_var -- variance of each equivalent div (ex. each January) --
+    and blur_var -- variance within each div (only non-zero if combine_steps > 0)
+
+    Kwargs:
+    list (str) [optional]: which list to use for calculating annual cycle
+    combine_steps (int) [optional]: how many consecutive datapoints should be used
+    for the analysis (ex. January 1-5, combine_steps = 5)
+    """
+
     try:
       list0 = kwargs['list']
     except:
@@ -192,6 +202,34 @@ class build(object):
     return all_step_vars, all_blur_vars
 
   def new(self, list2, **kwargs):
+    """
+    Makes new climate data based on existing modeled data and user options
+    using a step-wise approach (i.e. OCR Tools calculates each timestep in
+    sequence.)
+
+    Args:
+    * list2 (list): A list of climate data that is used as the 'experimental'
+    or end-member run compared to the list used to initialize class, which is
+    similar to a 'control' run. Must be the same length
+
+    Kwargs:
+    * a (float) [optional]: amplitude of change, i.e. how much the returned data aims
+    to deviate from list1 into (or beyond) list2. a = 1 means that the new data should
+    start equivalent to list1 and end equivalent to list2
+    * step_var_a (float) [optional]: how much random variance based on detrended step
+    variance to incorporate into new modeled data
+    * blur_var_a (float) [optional]: how much random variance based on variance within
+    each combine_step to incorporate into new modeled data
+    * var_min (float or Bool) [optional]: set lower limit to calculate values
+    * var_max (float or Bool) [optional]: set upper limit to calculate values
+    * snap (float) [optional]: corrective amount for if data strays far from source
+    * combine_steps (int) [optional]: how many consecutive datapoints should be used
+    for the analysis (ex. January 1-5, combine_steps = 5)
+    * head (int) [optional]: how many first years to use to set starting point of data
+    * tail (int) [optional]: how many last years to use to set projected end of data
+    * print_report (Bool) [optional]: saves a plot with list1 and list2 plotted and 
+    """
+
 
     try:
       combine_steps = kwargs['combine_steps']
@@ -228,6 +266,14 @@ class build(object):
       snap = kwargs["snap"]
     except:
       snap = 20.
+    try:
+      head = kwargs["head"]
+    except:
+      head = 1
+    try:
+      tail = kwargs["tail"]
+    except:
+      tail = 1
 
     list1 = self.base_list
 
@@ -247,7 +293,7 @@ class build(object):
     min0 = min1 if min1<min2 else min2
     data_range = max0-min0
 
-    if print_report == True:
+    if self.verbose == True:
       print("List 1 step_var: ")
       print(list1_step_var)
       print("List 1 blur_var: ")
@@ -257,6 +303,7 @@ class build(object):
       print("List 2 blur_var: ")
       print(list2_blur_var)
 
+    if print_report == True:
       x = np.arange(0, len(list1_base))
       plt.plot(x, list1_base, label = 'list 1')
       plt.plot(x, list2_base, label = 'list 2')
@@ -277,13 +324,14 @@ class build(object):
         ## ind0: list of starting segment indices (ex. january year 0 OR january+february year 0)
         ## indf: list of ending segment indices (ex. february year f OR march+april year f)
         ind0, indf, all_ind0, nstep = self.get_build_indices(list1, i, combine_steps)
-        all_val1, all_val2 = [pad_list1[int(k)] for k in all_ind0], [pad_list2[int(h)] for h in all_ind0]
-        full_step = a*(np.mean([pad_list2[k] for k in indf])-np.mean([pad_list1[h] for h in ind0]))
+
+        full_step = a*(np.mean([pad_list2[k+g*self.ndiv] for k in indf for g in range(head)]) - \
+          np.mean([pad_list1[m-n*self.ndiv] for m in ind0 for n in range(tail)]))
         opt_step = full_step/(len(list1)-1)
 
         full_steps.append(full_step)
         opt_steps.append(opt_step)
-        if (print_report == True and j == 0):
+        if (self.verbose == True and j == 0):
           print('ind0, indf, nstep')
           print(ind0, indf, nstep)
           print('Build indices:')
