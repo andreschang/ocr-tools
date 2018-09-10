@@ -125,8 +125,8 @@ class build(object):
       # print(i)
       ## ind0: list of starting segment indices (ex. january year 0 OR january+february year 0)
       ## indf: list of ending segment indices (ex. february year f OR march+april year f)
-      ind0, indf, all_ind, nstep = self.get_build_indices(list0, i, combine_steps)
-      all_vals.append([pad_list[int(k)] for k in all_ind])
+      ind0, indf, all_ind0, nstep = self.get_build_indices(list0, i, combine_steps)
+      all_vals.append([pad_list[int(k)] for k in all_ind0])
 
     for j in range(len(all_vals)-1):
       average_steps.append(np.mean(all_vals[j+1])-np.mean(all_vals[j]))
@@ -166,8 +166,8 @@ class build(object):
     all_blur_vars, all_step_vars  = [], []
 
     for i in all_step0:
-      ind0, indf, all_ind, nstep = self.get_build_indices(list0, i, combine_steps)
-      div_vals = [pad_list[int(k)] for k in all_ind]
+      ind0, indf, all_ind0, nstep = self.get_build_indices(list0, i, combine_steps)
+      div_vals = [pad_list[int(k)] for k in all_ind0]
 
       ## get blur variances for each div
       all_blur_var = []
@@ -278,8 +278,8 @@ class build(object):
       for j in range(combine_steps):
         ## ind0: list of starting segment indices (ex. january year 0 OR january+february year 0)
         ## indf: list of ending segment indices (ex. february year f OR march+april year f)
-        ind0, indf, all_ind, nstep = self.get_build_indices(list1, i, combine_steps)
-        all_val1, all_val2 = [pad_list1[int(k)] for k in all_ind], [pad_list2[int(h)] for h in all_ind]
+        ind0, indf, all_ind0, nstep = self.get_build_indices(list1, i, combine_steps)
+        all_val1, all_val2 = [pad_list1[int(k)] for k in all_ind0], [pad_list2[int(h)] for h in all_ind0]
         full_step = a*(np.mean([pad_list2[k] for k in indf])-np.mean([pad_list1[h] for h in ind0]))
         opt_step = full_step/(len(list1)-1)
 
@@ -289,7 +289,7 @@ class build(object):
           print('ind0, indf, nstep')
           print(ind0, indf, nstep)
           print('Build indices:')
-          print(all_ind)
+          print(all_ind0)
           print('Full step')
           print(full_step)
           print('opt_step')
@@ -367,21 +367,20 @@ class build(object):
     return new_list
 
 
-
   def get_build_indices(self, list0, div, combine_steps):
     """
-    Returns index lists - ind0, indf, and all_ind - and nstep.
+    Returns index lists - ind0, indf, and all_ind0 - and nstep.
     ind0 is the first div under consideration and indf is the next
-    regular step, taken from the last year. all_ind includes all the
-    "next steps" from every year in list (ex. if ind0 is Jan 1990,
-    indf is February 1995, and all_ind is Feb 1990-1995)
+    regular step, taken from the last year. all_ind0 includes all the
+    "ind0s" from every year in list (ex. if ind0 is Jan 1990,
+    indf is February 1995, and all_ind0 is Jan 1990-1995)
 
     Args:
     * list0 (list): Input list (only used for length assessments)
     * div (int): Specify which div in the year under consideration
      (0-364 or 0-11)
     * combine_steps (int): Specify number of steps to include in each
-    returned list, ind0, indf, and all_ind. Introduces some distortion
+    returned list, ind0, indf, and all_ind0. Introduces some distortion
 
     """
 
@@ -408,11 +407,11 @@ class build(object):
     nstep = int((divf-div-1)/self.ndiv)
     # print(nstep)
     # print(len(ind0))
-    all_ind = []
+    all_ind0 = []
     for j in range(nstep+1):
       for g in range(combine_steps):
-        all_ind.append(div+self.ndiv*j+g)
-    return ind0, indf, all_ind, nstep
+        all_ind0.append(div+self.ndiv*j+g)
+    return ind0, indf, all_ind0, nstep
 
 
 
