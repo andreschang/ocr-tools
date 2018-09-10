@@ -121,8 +121,6 @@ class build(object):
     all_vals, average_steps, div_average_steps = [], [], []
 
     for i in all_step0:
-      # print('step')
-      # print(i)
       ## ind0: list of starting segment indices (ex. january year 0 OR january+february year 0)
       ## indf: list of ending segment indices (ex. february year f OR march+april year f)
       ind0, indf, all_ind0, nstep = self.get_build_indices(list0, i, combine_steps)
@@ -136,11 +134,11 @@ class build(object):
       for j in range(combine_steps):
         div_average_steps.append(average_steps[i])
 
-    new_list = [list0[0]]
+    new_list = [np.mean(list0[0:combine_steps])]
     for i in range(len(list0)-1):
       year, div = divmod(i, self.ndiv)
       which_step = div
-      step_i = div_average_steps[which_step]+new_list[i]
+      step_i = div_average_steps[which_step]/(combine_steps)+new_list[i]
       new_list.append(step_i)
 
     print('Annual cycle of length '+str(len(new_list))+' calculated from list with combine_steps = '+str(combine_steps))
