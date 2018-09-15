@@ -195,11 +195,13 @@ class query(object):
             np.savetxt(report_out, [report], fmt='%s')
 
     def spatial_average(self, lat_bounds=[-89., 89.], lon_bounds=[-179., 179.],
-                        lon_convert=True, output='plot', **kwargs):
+                        lat=-999, lon=-999, lon_convert=True, output='plot',
+                        **kwargs):
         """
         Calculates the weighted average of a 3-dimensional variable (2D space
         plus time) and outputs a graph or list of the timeseries. Must be run
-        after set_params
+        after set_params. Can also be used for point timeseries by setting lat
+        and lon args
 
         Args:
         * lat_bounds (list) [optional]: 2-item list of lower and upper latitude
@@ -208,6 +210,10 @@ class query(object):
         '-' for longitudes west of the prime meridian and positive for east
         [-180 to 180] OR set values in the range [0-360] and set lon_convert to
         FALSE)
+        * lat (float) [optional]: target lat for point timeseries. Overrides
+        lat_bounds and lon_bounds args, if set to non-default value
+        * lon (float) [optional]: target lon for point timeseries. Overrides
+        lat_bounds and lon_bounds args, if set to non-default value
         * lon_convert (bool) [optional]: most climate datasets
         (perhaps not all) use longitude between 0-360, instead of the more
         intuitive -180 to 180. This will convert the longitudinal
@@ -232,6 +238,10 @@ class query(object):
         print(ts_var.shape)
         self.function = 'spatial_average'
         mvar = []
+
+        if lat != -999 and lon != -999:
+            lat_bounds, lon_bounds = self.get_latlon_point_indices(
+                lat=lat, lon=lon, lon_convert=lon_convert)
 
         # 2. CRUNCH IT UP!
         # Only works with 2d variables currently
@@ -971,6 +981,35 @@ class query(object):
 
         return lat_indices, lon_indices
 
+    def get_latlon_point_indices(self, lat, lon, lon_convert=True):
+        """
+        Returns lat_bounds and lon_bounds (2-item lists) around a single point
+
+        Args:
+        * lat (float): target lat
+        * lon (float): target lon
+        """
+
+        for i in range(25):
+            d = (i+1.)*0.125
+            try_lat_bounds = [lat-d, lat+d]
+            try_lon_bounds = [lon-d, lon+d]
+            lat_indices, lon_indices = self.get_latlon_indices(
+                try_lat_bounds, try_lon_bounds, print_report=False,
+                lon_convert=lon_convert)
+            if(len(lat_indices) > 0):
+                print("Calculating average over " + str(len(lat_indices)) +
+                      " indices")
+                if(len(self.lat0.shape) == 1):
+                    lat_found = self.lat0[lat_indices[0]]
+                    lon_found = self.lon0[lon_indices[0]]
+                else:
+                    lat_found = self.lat0[lat_indices[0], lon_indices[0]]
+                    lon_found = self.lon0[lat_indices[0], lon_indices[0]]
+                print(" for lat lon pair " + str(lat_found) + str(lon_found))
+
+                return try_lat_bounds, try_lon_bounds
+
     def setup_axes(self):
         """
         Reorders variable axes so that time axis is first
@@ -1257,24 +1296,26 @@ class query(object):
         * latmax (int): Maximum lat of query area
         * nlat (int): Number of latitudinal bands
         """
-
-        dy = (latmax-latmin)/(nlat-1)
-        lats = np.arange(latmin, latmax+dy, dy)[:nlat]
-        wgts = np.zeros(nlat)
-        if latmin == -90:
-            for i in range(nlat):
-                if ((i != 0) & (i != nlat-1)):
+        if latmin == latmax:
+            return([1])
+        else:
+            dy = (latmax-latmin)/(nlat-1)
+            lats = np.arange(latmin, latmax+dy, dy)[:nlat]
+            wgts = np.zeros(nlat)
+            if latmin == -90:
+                for i in range(nlat):
+                    if ((i != 0) & (i != nlat-1)):
+                        wgts[i] = np.abs(np.sin(np.deg2rad(lats[i]+(dy/2))) -
+                                         np.sin(np.deg2rad(lats[i]-(dy/2))))
+                    else:
+                        wgts[i] = 1-np.abs(np.sin(np.deg2rad(lats[i]+(dy/2))))
+            else:
+                for i in range(nlat):
                     wgts[i] = np.abs(np.sin(np.deg2rad(lats[i]+(dy/2))) -
                                      np.sin(np.deg2rad(lats[i]-(dy/2))))
-                else:
-                    wgts[i] = 1-np.abs(np.sin(np.deg2rad(lats[i]+(dy/2))))
-        else:
-            for i in range(nlat):
-                wgts[i] = np.abs(np.sin(np.deg2rad(lats[i]+(dy/2))) -
-                                 np.sin(np.deg2rad(lats[i]-(dy/2))))
 
-        wgts = wgts/(np.sum(wgts))
-        return(wgts)
+            wgts = wgts/(np.sum(wgts))
+            return(wgts)
 
     def assign_reporting_vars(self, kwargs0):
         """
