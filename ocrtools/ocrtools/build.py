@@ -210,7 +210,7 @@ class build(object):
 
         return all_step_vars, all_blur_vars
 
-    def new(self, list2, **kwargs):
+    def new(self, list2, save_rand=False, **kwargs):
         """
         Makes new climate data based on existing modeled data and user options
         using a step-wise approach (i.e. OCR Tools calculates each timestep in
@@ -221,6 +221,8 @@ class build(object):
         'experimental' or end-member run compared to the list used to
         initialize class, which is similar to a 'control' run.
         Must be the same length
+        * save_rand (bool): Also return list of random values calculated during
+        build loop
 
         Kwargs:
         * a (float) [optional]: amplitude of change, i.e. how much the returned
@@ -246,6 +248,8 @@ class build(object):
         end of data
         * print_report (Bool) [optional]: saves a plot with list1 and list2
         plots
+        * load_rand (list) [optional]: loads a list of random values instead
+        of calculating random variance at each timestep
         """
 
         try:
@@ -291,6 +295,10 @@ class build(object):
             tail = kwargs["tail"]
         except KeyError:
             tail = 1
+        try:
+            load_rand = kwargs["load_rand"]
+        except KeyError:
+            load_rand = None
 
         list1 = self.base_list
 
@@ -373,6 +381,7 @@ class build(object):
         new_list = [list1[0]]
         ghost_list = [list1[0]]
         list2_blur_var.append(list2_blur_var[0])
+        new_rand_list = []
 
         for i in range(len(list1)-1):
             which_year, which_div = divmod(i, self.ndiv)
@@ -387,12 +396,18 @@ class build(object):
                 (list2_blur_var[which_blur][which_year] +
                  list2_blur_var[which_blur_next][which_year_next])/2)**0.5
 
-            # step_0 = list0_base[i+1]
             step_i = (list1_base[i+1]-list1_base[i]) + \
                 opt_steps[which_blur] + ghost_list[i]
-            step_i = step_i + np.random.normal(0, step_dev) *  \
-                (step_var_a/50.) + np.random.normal(0, blur_dev) * \
-                (blur_var_a/50.)
+
+            if load_rand is None:
+                r1, r2 = np.random.normal(), np.random.normal()
+            else:
+                r1, r2 = load_rand[i][0], load_rand[i][1]
+
+            step_i = step_i + r1 * step_dev * (step_var_a/50.) + r2 * \
+                blur_dev * (blur_var_a/50.)
+            new_rand_list.append([r1, r2])
+
             if var_min is not None:
                 if step_i < var_min:
                     step_i = var_min
@@ -424,7 +439,10 @@ class build(object):
             # do some displacement here
             new_list.append(step_i)
 
-        return new_list
+        if save_rand is True:
+            return new_list, new_rand_list
+        else:
+            return new_list
 
     def magnet(self, list0, listM, **kwargs):
         try:
