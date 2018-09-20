@@ -742,7 +742,7 @@ class query(object):
             try:
                 self.file, start_index, end_index = self.grab_reduced_data()
                 self.data_yr0 = [self.yr0]
-            except AttributeError:
+            except (AttributeError, TypeError):
                 pass
             self.f_open = Dataset(self.file[0])
 
