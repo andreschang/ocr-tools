@@ -100,6 +100,8 @@ class build(object):
         list (str) [optional]: which list to use for calculating annual cycle
         combine_steps (int) [optional]: how many consecutive datapoints should
         be used for the analysis (ex. January 1-5, combine_steps = 5)
+        savgol_window (float) [optional]: coefficient for Savitzky-Golay
+        filter. Higher number leads to more smoothing
         """
 
         try:
@@ -113,6 +115,10 @@ class build(object):
                 combine_steps = self.combine_steps
             except AttributeError:
                 combine_steps = 1
+        try:
+            savgol_window = kwargs['savgol_window']
+        except KeyError:
+            savgol_window = 0
 
         # List of each starting data index (ind0) to be used for annual cycle
         # If combine_steps = 1, then this is every div. If = 2, every other div
@@ -143,6 +149,10 @@ class build(object):
             which_step = div
             step_i = div_average_steps[which_step]/(combine_steps)+new_list[i]
             new_list.append(step_i)
+
+        # Smooth with Savitzky-Golay filter
+        if savgol_window > 0:
+            new_list = signal.savgol_filter(new_list, savgol_window, 2)
 
         if self.verbose is True:
             print('Annual cycle of length '+str(len(new_list)) +
@@ -250,6 +260,9 @@ class build(object):
         plots
         * load_rand (list) [optional]: loads a list of random values instead
         of calculating random variance at each timestep
+        * snap_atten (float) [optional]: how much to attenuate dynamic snapping
+        * savgol_window (float) [optional]: coefficient for Savitzky-Golay
+        filter used in annual_cycle(). Higher number leads to more smoothing
         """
 
         try:
@@ -299,11 +312,21 @@ class build(object):
             load_rand = kwargs["load_rand"]
         except KeyError:
             load_rand = None
+        try:
+            snap_atten = kwargs["snap_atten"]
+        except KeyError:
+            snap_atten = 25
+        try:
+            savgol_window = kwargs["savgol_window"]
+        except KeyError:
+            savgol_window = 0
 
         list1 = self.base_list
 
-        list1_base = self.annual_cycle(list=list1, combine_steps=combine_steps)
-        list2_base = self.annual_cycle(list=list2, combine_steps=combine_steps)
+        list1_base = self.annual_cycle(list=list1, combine_steps=combine_steps,
+                                       savgol_window=savgol_window)
+        list2_base = self.annual_cycle(list=list2, combine_steps=combine_steps,
+                                       savgol_window=savgol_window)
         # step var is detrended variance of each div
         # (ex. january or mean(january, february))
         # blur var is variance of each "combine_steps" segment
@@ -375,14 +398,34 @@ class build(object):
                     print('opt_step')
                     print(opt_step)
 
-        # print('step_var, blur_var')
-        # print(list1_step_var, list1_blur_var)
+        # Calculate snap amounts
+        self.snap_list = [0]
 
+        for i in range(len(list1)-1):
+            which_year, which_div = divmod(i, self.ndiv)
+            which_blur = int(which_div/combine_steps)
+
+            which_year_next, which_div_next = divmod(i+1, self.ndiv)
+            which_blur_next = int(which_div_next/combine_steps)
+
+            step_dev = ((list2_step_var[which_blur] +
+                        list2_step_var[which_blur_next])/2)**0.5
+
+            snap_c0 = step_dev/data_range
+
+            # if div deviation is high, snap less
+            if snap_c0 >= snap/100.:
+                snap_c = 0
+            else:
+                snap_c = (1.-snap_c0/(snap/100.))**((100-snap_atten)/100)
+
+            self.snap_list.append(snap_c)
+
+        # Generate new climate data
         new_list = [list1[0]]
         ghost_list = [list1[0]]
         list2_blur_var.append(list2_blur_var[0])
         new_rand_list = []
-        self.snap_list = [0]
 
         for i in range(len(list1)-1):
             which_year, which_div = divmod(i, self.ndiv)
@@ -418,17 +461,8 @@ class build(object):
 
             ghost_list.append(step_i)
 
-            snap_c0 = step_dev/data_range
-            # print(snap_c0)
-
-            # if div deviation is high, snap less
-            if snap_c0 >= snap/100.:
-                snap_c = 1.
-            else:
-                snap_c = snap_c0/(snap/100.)
-
-            self.snap_list.append(1. - snap_c)
-            step_i = (1-snap_c)*list0_base[i+1]+(snap_c)*step_i
+            snap_c = self.snap_list[i+1]
+            step_i = (snap_c)*list0_base[i+1]+(1 - snap_c)*step_i
 
             if var_min is not None:
                 if step_i < var_min:
