@@ -17,7 +17,7 @@ ndivs = st.ndivs
 
 class build(object):
 
-    def __init__(self, query, base_list, verbose=True, dt='monthly', **kwargs):
+    def __init__(self, query, base_list, verbose=True, **kwargs):
         """
         Initializes a build object that can be used to modify and/or
         interpolate between existing climate simulation data products
@@ -315,7 +315,7 @@ class build(object):
         try:
             snap_atten = kwargs["snap_atten"]
         except KeyError:
-            snap_atten = 25
+            snap_atten = 0
         try:
             savgol_window = kwargs["savgol_window"]
         except KeyError:
