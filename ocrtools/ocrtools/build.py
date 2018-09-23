@@ -382,6 +382,7 @@ class build(object):
         ghost_list = [list1[0]]
         list2_blur_var.append(list2_blur_var[0])
         new_rand_list = []
+        self.snap_list = [0]
 
         for i in range(len(list1)-1):
             which_year, which_div = divmod(i, self.ndiv)
@@ -426,7 +427,7 @@ class build(object):
             else:
                 snap_c = snap_c0/(snap/100.)
 
-            # print(snap_c)
+            self.snap_list.append(1. - snap_c)
             step_i = (1-snap_c)*list0_base[i+1]+(snap_c)*step_i
 
             if var_min is not None:
