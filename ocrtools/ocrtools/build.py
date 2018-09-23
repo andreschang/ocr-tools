@@ -43,8 +43,6 @@ class build(object):
 
         self.base_list = base_list
         self.verbose = verbose
-        self.dt = dt
-        self.ndiv = ndivs[dt]
         try:
             self.dt = kwargs['dt']
         except KeyError:
@@ -53,7 +51,7 @@ class build(object):
             except AttributeError:
                 raise "Could not autofill dt. Please specify dt in build init \
                         with kwarg dt"
-
+        self.ndiv = ndivs[self.dt]
         try:
             self.stage = kwargs['stage']
         except KeyError:
@@ -420,6 +418,8 @@ class build(object):
                 snap_c = (1.-snap_c0/(snap/100.))**((100-snap_atten)/100)
 
             self.snap_list.append(snap_c)
+
+        self.snap_list = signal.savgol_filter(self.snap_list, savgol_window, 2)
 
         # Generate new climate data
         new_list = [list1[0]]
