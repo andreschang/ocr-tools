@@ -261,6 +261,10 @@ class build(object):
         * snap_atten (float) [optional]: how much to attenuate dynamic snapping
         * savgol_window (float) [optional]: coefficient for Savitzky-Golay
         filter used in annual_cycle(). Higher number leads to more smoothing
+        * hist_stretch (bool) [optional]: enhances contrast of data series
+        based on input value and max/min values of input data.
+        * hist_dist (function) [optional]: distribution of histogram
+        stretching. Should be 0-1.
         """
 
         try:
@@ -318,6 +322,19 @@ class build(object):
             savgol_window = kwargs["savgol_window"]
         except KeyError:
             savgol_window = 0
+        try:
+            hist_stretch = kwargs["hist_stretch"]
+        except KeyError:
+            hist_stretch = False
+        try:
+            if kwargs["hist_dist"]:
+                c_dist = kwargs["hist_dist"]
+            else:
+                def c_dist(x):
+                    return(x)
+        except KeyError:
+            def c_dist(x):
+                return(x)
 
         list1 = self.base_list
 
@@ -473,6 +490,30 @@ class build(object):
 
             # do some displacement here
             new_list.append(step_i)
+
+        # enhance contrast
+        if hist_stretch:
+            in_mean = np.mean(new_list)
+            in_dev = np.var(new_list)**0.5
+            contrast_lims = [in_mean-in_dev, in_mean+in_dev]
+            c_range = contrast_lims[1]-contrast_lims[0]
+
+            if var_min is not None:
+                out_min = var_min
+            else:
+                out_min = np.amin(list1+list2)
+            if var_max is not None:
+                out_max = var_max
+            else:
+                out_max = np.amax(list1+list2)
+
+            for div in range(len(new_list)):
+                if (new_list[div] > contrast_lims[0] and
+                      new_list[div] < contrast_lims[1]):
+                    new_list[div] = (
+                        out_min +
+                        (c_dist((new_list[div] - contrast_lims[0]) /
+                         c_range)*(out_max-out_min)))
 
         if save_rand is True:
             return new_list, new_rand_list

@@ -11,7 +11,7 @@
 from setuptools import setup
 
 setup(name='ocrtools',
-      version='0.1',
+      version='0.2',
       description='Making climate data malleable',
       url='https://github.com/andreschang/ocr-tools',
       author='Andres Chang',
