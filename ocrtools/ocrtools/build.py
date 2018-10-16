@@ -211,10 +211,12 @@ class build(object):
             # print(all_blur_vars)
             # print(np.var(signal.detrend(all_blur_means)))
 
-        print(
-            'Blur var of length '+str(len(all_blur_vars)) +
-            ', with sublist of length '+str(len(all_blur_vars[0])) +
-            ', and step var of length '+str(len(all_step_vars))+' calculated')
+        if self.verbose:
+            print(
+                'Blur var of length '+str(len(all_blur_vars)) +
+                ', with sublist of length '+str(len(all_blur_vars[0])) +
+                ', and step var of length '+str(len(all_step_vars)) +
+                ' calculated')
 
         return all_step_vars, all_blur_vars
 
@@ -360,7 +362,7 @@ class build(object):
         min0 = min1 if min1 < min2 else min2
         data_range = max0-min0
 
-        if self.verbose is True:
+        if self.verbose:
             print("List 1 step_var: ")
             print(list1_step_var)
             print("List 1 blur_var: ")
@@ -370,7 +372,7 @@ class build(object):
             print("List 2 blur_var: ")
             print(list2_blur_var)
 
-        if print_report is True:
+        if print_report:
             x = np.arange(0, len(list1_base))
             plt.plot(x, list1_base, label='list 1')
             plt.plot(x, list2_base, label='list 2')
