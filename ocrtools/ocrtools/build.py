@@ -302,10 +302,16 @@ class build(object):
             a = 1
         try:
             snap = kwargs["snap"]
-            if snap > 50:
-                snap = 50
+            if snap > 15:
+                snap = 15
         except KeyError:
-            snap = 20.
+            snap = 10.
+        try:
+            snap_atten = kwargs["snap_atten"]
+            if snap_atten > 50:
+                snap_atten = 50
+        except KeyError:
+            snap_atten = 20
         try:
             head = kwargs["head"]
         except KeyError:
@@ -454,12 +460,13 @@ class build(object):
                 blur_dev * (blur_var_a/50.)
             new_rand_list.append([r1, r2])
 
-            # Normalize snapping envelope to 3.5 standard deviations
+            # Normalize snapping envelope to 5 standard deviations
             dev_from_base = np.abs(
-                step_i1 - (list0_base[i+1]))/(step_dev * 3.5)
+                step_i1 - (list0_base[i+1]))/(step_dev * (15-snap))
             if dev_from_base > 1:
                 dev_from_base = 1
-            snap_amt = dev_from_base**((50-snap)/10)
+
+            snap_amt = dev_from_base**((50-snap_atten)/5)
             self.snap_list.append(snap_amt)
             step_i1 = (snap_amt * list0_base[i+1]) + (1-snap_amt)*step_i1
 
