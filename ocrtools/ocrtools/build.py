@@ -302,6 +302,8 @@ class build(object):
             a = 1
         try:
             snap = kwargs["snap"]
+            if snap > 50:
+                snap = 50
         except KeyError:
             snap = 20.
         try:
@@ -316,10 +318,6 @@ class build(object):
             load_rand = kwargs["load_rand"]
         except KeyError:
             load_rand = None
-        try:
-            snap_atten = kwargs["snap_atten"]
-        except KeyError:
-            snap_atten = 0
         try:
             savgol_window = kwargs["savgol_window"]
         except KeyError:
@@ -338,17 +336,18 @@ class build(object):
             def c_dist(x):
                 return(x)
 
+        # First calculate the mean cycle (climatology) of both input lists
         list1 = self.base_list
-
         list1_base = self.annual_cycle(list=list1, combine_steps=combine_steps,
                                        savgol_window=savgol_window)
         list2_base = self.annual_cycle(list=list2, combine_steps=combine_steps,
                                        savgol_window=savgol_window)
+
+        # calculate variances:
         # step var is detrended variance of each div
         # (ex. january or mean(january, february))
         # blur var is variance of each "combine_steps" segment
         # (ex. january (0) or var(january, february) year 0)
-
         list1_step_var, list1_blur_var = self.get_variance(
             list=list1, combine_steps=combine_steps)
         list2_step_var, list2_blur_var = self.get_variance(
@@ -356,12 +355,11 @@ class build(object):
 
         # Make an average of the list1 and list2 bases
         list0_base = np.mean([list1_base, list2_base], axis=0)
-        max1, max2 = np.amax(list1), np.amax(list2)
-        min1, min2 = np.amin(list1), np.amin(list2)
-        max0 = max1 if max1 > max2 else max2
-        min0 = min1 if min1 < min2 else min2
+        max0 = np.amax(list1 + list2)
+        min0 = np.amin(list1 + list2)
         data_range = max0-min0
 
+        # Some print-outs
         if self.verbose:
             print("List 1 step_var: ")
             print(list1_step_var)
@@ -382,10 +380,16 @@ class build(object):
             plt.savefig(f1, dpi=200)
             plt.close()
 
+        # Array of each starting step in year (ex. if combine_steps = 3
+        # all_step0 = [0, 3, 6])
         all_step0 = np.arange(0, self.ndiv, combine_steps)
         pad_list1 = np.concatenate((list1, list1[-self.ndiv:]))
         pad_list2 = np.concatenate((list2, list2[-self.ndiv:]))
 
+        # Absolute 'full_step' is calculated, which is the change between
+        # div(i~), yr0 and div(i~+1), yrf. Where i~ here means the full
+        # 'combine_steps' div. Ex. January 1-5 1995, January 6-10 2000.
+        # Opt steps is the full step divided by number of years
         full_steps, opt_steps = [], []
 
         for i in all_step0:
@@ -401,7 +405,7 @@ class build(object):
                                        in indf for g in range(tail)]) -
                                np.mean([pad_list1[m+n*self.ndiv]for m
                                        in ind0 for n in range(head)]))
-                opt_step = full_step/(len(list1)-1)
+                opt_step = full_step/(len(list1)/self.ndiv - 1)
 
                 full_steps.append(full_step)
                 opt_steps.append(opt_step)
@@ -415,34 +419,11 @@ class build(object):
                     print('opt_step')
                     print(opt_step)
 
-        # Calculate snap amounts
+        # List with snap amounts
         self.snap_list = [0]
 
-        for i in range(len(list1)-1):
-            which_year, which_div = divmod(i, self.ndiv)
-            which_blur = int(which_div/combine_steps)
-
-            which_year_next, which_div_next = divmod(i+1, self.ndiv)
-            which_blur_next = int(which_div_next/combine_steps)
-
-            step_dev = ((list2_step_var[which_blur] +
-                        list2_step_var[which_blur_next])/2)**0.5
-
-            snap_c0 = step_dev/data_range
-
-            # if div deviation is high, snap less
-            if snap_c0 >= snap/100.:
-                snap_c = 0
-            else:
-                snap_c = (1.-snap_c0/(snap/100.))**((100-snap_atten)/100)
-
-            self.snap_list.append(snap_c)
-
-        self.snap_list = signal.savgol_filter(self.snap_list, savgol_window, 2)
-
-        # Generate new climate data
+        # Generate new climate data starting at list1
         new_list = [list1[0]]
-        ghost_list = [list1[0]]
         list2_blur_var.append(list2_blur_var[0])
         new_rand_list = []
 
@@ -450,48 +431,48 @@ class build(object):
             which_year, which_div = divmod(i, self.ndiv)
             which_blur = int(which_div/combine_steps)
 
+            # Value at step_i+1 calculated from 'opt_step'
+            step_i1 = new_list[i] + opt_steps[which_blur]
+
+            # Add some randomness based on observed deviation in input
+            # data and user args.
+            # First, get average standard deviation in step i and i+1
             which_year_next, which_div_next = divmod(i+1, self.ndiv)
             which_blur_next = int(which_div_next/combine_steps)
-
             step_dev = ((list2_step_var[which_blur] +
                         list2_step_var[which_blur_next])/2)**0.5
             blur_dev = (
                 (list2_blur_var[which_blur][which_year] +
                  list2_blur_var[which_blur_next][which_year_next])/2)**0.5
 
-            step_i = (list1_base[i+1]-list1_base[i]) + \
-                opt_steps[which_blur] + ghost_list[i]
-
             if load_rand is None:
                 r1, r2 = np.random.normal(), np.random.normal()
             else:
                 r1, r2 = load_rand[i][0], load_rand[i][1]
 
-            step_i = step_i + r1 * step_dev * (step_var_a/50.) + r2 * \
+            step_i1 = step_i1 + r1 * step_dev * (step_var_a/50.) + r2 * \
                 blur_dev * (blur_var_a/50.)
             new_rand_list.append([r1, r2])
 
+            # Normalize snapping envelope to 3.5 standard deviations
+            dev_from_base = np.abs(
+                step_i1 - (list0_base[i+1]))/(step_dev * 3.5)
+            if dev_from_base > 1:
+                dev_from_base = 1
+            snap_amt = dev_from_base**((50-snap)/10)
+            self.snap_list.append(snap_amt)
+            step_i1 = (snap_amt * list0_base[i+1]) + (1-snap_amt)*step_i1
+
+            # If var_min or var_max exceeded, set to min/max allowed value
             if var_min is not None:
-                if step_i < var_min:
-                    step_i = var_min
+                if step_i1 < var_min:
+                    step_i1 = var_min
             if var_max is not None:
-                if step_i > var_max:
-                    step_i = var_max
+                if step_i1 > var_max:
+                    step_i1 = var_max
 
-            ghost_list.append(step_i)
-
-            snap_c = self.snap_list[i+1]
-            step_i = (snap_c)*list0_base[i+1]+(1 - snap_c)*step_i
-
-            if var_min is not None:
-                if step_i < var_min:
-                    step_i = var_min
-            if var_max is not None:
-                if step_i > var_max:
-                    step_i = var_max
-
-            # do some displacement here
-            new_list.append(step_i)
+            # add it to the list!
+            new_list.append(step_i1)
 
         # enhance contrast
         if hist_stretch:
@@ -510,12 +491,13 @@ class build(object):
                 out_max = np.amax(list1+list2)
 
             for div in range(len(new_list)):
-                if (new_list[div] > contrast_lims[0] and
+                if (
+                      new_list[div] > contrast_lims[0] and
                       new_list[div] < contrast_lims[1]):
-                    new_list[div] = (
-                        out_min +
-                        (c_dist((new_list[div] - contrast_lims[0]) /
-                         c_range)*(out_max-out_min)))
+                    new_list[div] = (out_min +
+                                     (c_dist((new_list[div] -
+                                      contrast_lims[0]) /
+                                      c_range)*(out_max-out_min)))
 
         if save_rand is True:
             return new_list, new_rand_list
