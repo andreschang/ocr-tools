@@ -28,7 +28,7 @@ Let's find out more about the 'air' var.
 Uncomment the hashed lines to keep going!
 """
 
-# mystery_file.first_look(var = 'air')
+mystery_file.first_look(var = 'air')
 
 """
 Still quite a few unknowns but we keep on moving. 
@@ -36,8 +36,8 @@ The set_params() function is interactive and provides us with all kinds
 of helpful feedback. I wonder if we can learn about air temperature in NYC...
 """
 
-# nyc_temp = mystery_file
-# nyc_temp.set_params()
+nyc_temp = mystery_file
+nyc_temp.set_params()
 
 
 """
@@ -46,7 +46,7 @@ and offers suggestions for some of the trickier ones like data_yr0.
 Now we are ready to look at temperature over NYC.
 """
 
-# nyc_temp.spatial_average(lat_bounds = [40,42], lon_bounds = [-75, -73])
+nyc_temp.spatial_average(lat_bounds = [40,42], lon_bounds = [-75, -73])
 
 """
 FYI, we can also set all of the parameters before submitting the script to save time 
