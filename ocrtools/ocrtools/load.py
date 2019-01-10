@@ -9,7 +9,6 @@
 ########################################
 
 import numpy as np
-import pandas as pd
 import xarray as xr
 
 
@@ -39,6 +38,7 @@ def standardize_coords(dataset, center=True):
     other namings)
 
     Args:
+    * dataset (xarray.Dataset)
     * center (bool): True by default - uses TLAT/TLON if multiple coordinate
     systems. If False, uses ULAT/ULON (case insensitive)
     """
@@ -65,24 +65,23 @@ def standardize_coords(dataset, center=True):
                 c_key = input('Please enter ' + ci +
                               ', as shown in the original coordinate list: ')
 
-            if(ci == 'lat'):
-                dataset = dataset.assign_coords(
-                    lat=dataset.coords[c_key])
-            elif(ci == 'lon'):
-                dataset = dataset.assign_coords(
-                    lon=dataset.coords[c_key])
+            dataset.coords[ci] = dataset.coords[c_key]
+
 
     return(dataset)
 
 
-def load(data, var=[], interactive=True, **kwargs):
+def load(data, var=[], interactive=True, drop=True, **kwargs):
     """
     Return a dataset with standardized coordinate names for easy querying
 
     Args:
-    * data (str or dataset): either an xarray dataset or a path to netCDF that
-    will be read in by xr_load function
-    * var (string): name of main variable. If '?', will be set interactively
+    * data (str or xarray.Dataset): either an xarray dataset or a path to
+    netCDF that will be read in by xr_load function
+    * var (string): name of main variable (optional)
+    * interactive (bool): instructions for the less-experienced programmer :)
+    * drop (bool): if True and var(s) specified, other vars are removed from
+    the dataset
     """
 
     # Load xarray dataset
@@ -119,6 +118,84 @@ def load(data, var=[], interactive=True, **kwargs):
     else:
         raise ValueError('main_vars must specify data variables in the xarray')
 
-    ds = standardize_coords(ds)
+    # Standardize coordinate names
+    try:
+        ds = standardize_coords(ds, center=kwargs['center'])
+    except KeyError:
+        ds = standardize_coords(ds)
+
+    if drop:
+        ds = ds[ds.main_vars]
 
     return(ds)
+
+
+def piece(dataset, scope):
+    """
+    Returns a subsetted dataset based on scope
+    Args:
+    * dataset (xarray.Dataset)
+    * scope (ocrtools.scope)
+    """
+
+    scope_keys = [x for x in scope.__dict__.keys()]
+
+    d_subset = dataset.sel(time=slice(scope.yr0+'-01-01', scope.yrf+'-12-31'))
+    d_subset = d_subset.where(
+        (dataset.lat >= scope.lat_min) &
+        (dataset.lat <= scope.lat_max) &
+        (dataset.lon >= scope.lon_min) &
+        (dataset.lon <= scope.lon_max))
+
+    if 'z_max' in scope_keys:
+        d_subset = d_subset.where(d_subset.z <= scope.z_max)
+    if 'z_min' in scope_keys:
+        d_subset = d_subset.where(d_subset.z >= scope.z_min)
+
+    return(d_subset)
+
+
+class scope(object):
+    """
+    Class that is used to subset data in space and time
+
+    Args:
+    * interactive (bool): instructions for the less-experienced programmer :)
+    * kwargs: lat_min, lat_max, lon_min, lon_max, yr0, yrf are always defined
+    to some extent. If z_min and z_max are included as keywords, they will also
+    be used added as attributes to the scope object
+    """
+
+    def __init__(self, interactive=True, **kwargs):
+
+        scopes = ['yr0', 'yrf', 'lat_min', 'lat_max', 'lon_min', 'lon_max']
+        none_vals = {'lat_min': -91, 'lat_max': 91, 'lon_min': -361,
+                     'lon_max': 361, 'yr0': 1, 'yrf': 10000}
+
+        try:
+            if(kwargs['z_min']):
+                scopes = scopes + ['z_min']
+        except KeyError:
+            pass
+        try:
+            if(kwargs['z_max']):
+                scopes = scopes + ['z_max']
+        except KeyError:
+            pass
+
+        for ai in scopes:
+            try:
+                setattr(self, ai, kwargs[ai])
+            except KeyError:
+                if interactive:
+                    lim0 = input('Enter ' + ai + ': ')
+                    if lim0 == '':
+                        lim0 = none_vals[ai]
+
+                    if 'yr' in ai:
+                        setattr(self, ai, str(lim0))
+                    else:
+                        setattr(self, ai, float(lim0))
+
+                else:
+                    setattr(self, ai, none_vals[ai])
