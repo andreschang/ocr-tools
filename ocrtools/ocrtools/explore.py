@@ -10,16 +10,57 @@
 
 import numpy as np
 import xarray as xr
+from ocrtools.tk_selector import plt
+import cf_units
+from datetime import date, datetime
 
+def spatial_average(data, cell_area=None):
+    """
+    Returns approximate spatial average of 3D data
 
-def spatial_average(dataset):
+    Args:
+    * data (xarray dataset or data_array)
+    * cell_area (data_array): array of cell areas
+    """
 
-    if len(dataset['lat'].shape) == 1:
-        zonal_mean = dataset.mean(dim='lon')
-        weights = xr.DataArray(
-            reg_wgt(np.min(dataset['lat']), np.max(dataset['lat']),
-                    dataset['lat'].shape[0]), coords=[('lat', dataset['lat'])])
-        weighted_mean = zonal_mean.to_array().dot(weights)
+    try:
+        d0 = data.to_array()
+        dataset_in = True
+    except AttributeError:
+        d0 = data
+        dataset_in = False
+
+    if len(d0['lat'].shape) == 1:
+        lat_weights = xr.DataArray(
+            reg_wgt(np.min(d0['lat']), np.max(d0['lat']),
+                    d0['lat'].shape[0]), coords=[('lat', d0['lat'])])
+
+        # If dataset contains NaN values, calculate average of cell value,
+        # weighted by latitude
+        if np.sum(np.isnan(d0)) > 0:
+            cell_weights = lat_weights * d0['lat'].shape[0] / np.sum(
+                np.isfinite(d0.isel(variable=0, time=0)))
+            weighted_mean = (d0 * cell_weights).sum(dim=['lat', 'lon'])
+
+        # Otherwise, zonal mean and then weighted meridional mean (faster)
+        else:
+            zonal_mean = d0.mean(dim='lon')
+            weighted_mean = zonal_mean.dot(lat_weights)
+
+    elif len(d0['lat'].shape) == 2:
+        if cell_area is None:
+            raise ValueError('Cell area must be defined as a function arg',
+                             ' to calculate spatial average of a variable',
+                             ' across a curvilinear grid')
+        else:
+            weighted_mean = (
+                d0 * cell_area/cell_area.sum()).sum(
+                dim=[n for n in d0.dims if n != 'time' and n != 'variable'])
+
+    if dataset_in:
+        weighted_mean = weighted_mean.to_dataset(dim='variable')
+
+    return(weighted_mean)
 
 
 def reg_wgt(latmin, latmax, nlat):
