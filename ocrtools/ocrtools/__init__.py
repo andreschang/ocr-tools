@@ -10,3 +10,4 @@
 
 from ocrtools.load import *
 from ocrtools.tk_selector import *
+from ocrtools.explore import *
