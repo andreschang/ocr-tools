@@ -5,7 +5,10 @@ channels:
 dependencies:
   - python >= 3.5
   - basemap
+  - cf_units
   - matplotlib
   - netcdf4
   - numpy
+  - pandas
   - scipy
+  - xarray

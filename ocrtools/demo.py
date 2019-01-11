@@ -2,13 +2,13 @@
 # -*- coding: utf-8 -*-
 
 ###############################################################################
-#  
+#
 #  OCRTOOLS - Making climate data malleable
 #  Copyright (C) 2018 Andres Chang
 #
 ###############################################################################
 
-import ocrtools.query as query
+import ocrtools as ocr
 
 """
 ocrtools.query is used to explore climate data, set parameters,
@@ -18,7 +18,7 @@ First, call a query object with file (or src)
 Not sure what is in the file? Call first_look
 """
 print("\nMYSTERY FILE ANALYSIS")
-mystery_file = query(file = 'data/raw/air.mon.mean.nc' )
+mystery_file = ocr.query(file='data/raw/air.mon.mean.nc')
 mystery_file.first_look()
 
 
@@ -28,7 +28,7 @@ Let's find out more about the 'air' var.
 Uncomment the hashed lines to keep going!
 """
 
-mystery_file.first_look(var = 'air')
+mystery_file.first_look(var='air')
 
 """
 Still quite a few unknowns but we keep on moving. 
@@ -46,14 +46,14 @@ and offers suggestions for some of the trickier ones like data_yr0.
 Now we are ready to look at temperature over NYC.
 """
 
-nyc_temp.spatial_average(lat_bounds = [40,42], lon_bounds = [-75, -73])
+nyc_temp.spatial_average(lat_bounds=[40,42], lon_bounds=[-75, -73])
 
 """
 FYI, we can also set all of the parameters before submitting the script to save time 
 once we know what we're doing...
 
-nyc_temp.set_params(var = 'air', dt = 'monthly', lat_name = 'lat', lon_name = 'lon', \
-dim = ["time", "lat", "lon"], data_yr0 = 1948)
+nyc_temp.set_params(var='air', dt='monthly', lat_name='lat', lon_name='lon', \
+dim=["time", "lat", "lon"], data_yr0=1948)
 """
 
 """
@@ -70,7 +70,7 @@ which specifies file directory structure and naming conventions.
 """
 
 # import ocrtools.stage as st
-# demo = st(preset = 'demo', time_as = 'date')
+# demo = st(preset='demo', time_as='date')
 # query.stage = demo
 
 # print("\nCESM ANALYSIS")
