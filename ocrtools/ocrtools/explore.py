@@ -9,11 +9,26 @@
 ########################################
 
 import numpy as np
-
+import xarray as xr
 
 def spatial_average(dataset):
-    zonal_mean = dataset.mean(dim='lon')
-    print(zonal_mean)
+
+    if len(dataset['lat'].shape) == 1:
+        zonal_mean = dataset.mean(dim='lon')
+        weights = xr.DataArray(
+            reg_wgt(np.min(dataset['lat']), np.max(dataset['lat']),
+                    dataset['lat'].shape[0]), dims=['lat'])
+        print(weights)
+        # print(zonal_mean)
+        print(dataset.to_array())
+        dset = dataset.to_array()
+        dset.dot(weights)
+        aak
+        weighted_means = dataset.to_array().dot(weights)
+        # print(zonal_mean)
+        # print(weighted_means)
+        aak
+        
 
 
 def reg_wgt(latmin, latmax, nlat):

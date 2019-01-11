@@ -53,6 +53,7 @@ PART 3: SOME BASIC ANALYSIS
 Many basic transformations can be applied to xarray datasets
 Let's take a look at the average temperature across areas that we selected
 """
+# print(temp_simulated.coords['lat'])
 print(ocr.spatial_average(subsetted_temp_obs))
 
 
