@@ -12,9 +12,10 @@ import numpy as np
 import xarray as xr
 import cf_units
 import time
+from datetime import date
 
 
-def xr_load(path, average=True):
+def xr_load(path, average=True, datetime64=True):
     """
     Loads a netCDF and fixes date convention for CESM-LE or other Gregorian
     calendar data
@@ -31,6 +32,13 @@ def xr_load(path, average=True):
         calendar = 'standard'
 
     t0 = cf_units.num2date(d.time, d.time.units, calendar)
+
+    # Convert to datetime64 for compatibility with Pandas later
+    if calendar != 'standard' and datetime64:
+        to_num = np.add(cf_units.date2num(t0, 'days since 0002-01-01 00:00:00',
+                        cf_units.CALENDAR_STANDARD), np.ones(t0.shape))
+        to_cal = [date.fromordinal(int(n)).isoformat() for n in to_num]
+        t0 = np.array(to_cal, dtype='datetime64[ns]')
 
     if average:
         deltas = np.roll(np.diff(t0), 1)
@@ -180,7 +188,9 @@ def subset(dataset, scope):
     scope_keys = [x for x in scope.__dict__.keys()]
 
     # First subset year range
-    d_subset = dataset.sel(time=slice(scope.yr0+'-01-01', scope.yrf+'-12-31'))
+    t0 = scope.yr0+'-01-01' if scope.yr0 is not None else np.min(dataset['time'])
+    tf = scope.yrf+'-01-01' if scope.yrf is not None else np.max(dataset['time'])
+    d_subset = dataset.sel(time=slice(t0, tf))
 
     def box_subset(d_in, lat_min, lat_max, lon_min, lon_max):
         d_out = d_in.where(
@@ -223,7 +233,7 @@ class scope(object):
 
     Args:
     * interactive (bool): instructions for the less-experienced programmer :)
-    * kwargs: lat_min, lat_max, lon_min, lon_max, yr0, yrf are always defined
+    * kwargs: lat_min, lat_max, lon_min, lon_max are always defined
     to some extent. If z_min and z_max are included as keywords, they will also
     be used added as attributes to the scope object
     """
@@ -233,7 +243,7 @@ class scope(object):
 
         scopes = ['yr0', 'yrf', 'lat_min', 'lat_max', 'lon_min', 'lon_max']
         none_vals = {'lat_min': -90, 'lat_max': 90, 'lon_min': -180,
-                     'lon_max': 180, 'yr0': '0001', 'yrf': '3000'}
+                     'lon_max': 180, 'yr0': None, 'yrf': None}
 
         if((interactive and any(x not in kwargs for x in scopes))
            or (all(x not in kwargs for x in scopes[2:]) and tk_select)):
@@ -271,14 +281,16 @@ class scope(object):
                         lim0 = input('Enter ' + ai + ': ')
                         if lim0 == '':
                             lim0 = none_vals[ai]
-                        setattr(self, ai, float(lim0))
+                        else:
+                            lim0 = float(lim0)
+                        setattr(self, ai, lim0)
                     else:
                         setattr(self, ai, none_vals[ai])
 
             # Convert lon values, if needed
             if 'lon' in ai:
                 setattr(self, ai, getattr(self, ai)+(180 - prime_meridian))
-            if 'yr' in ai:
+            if 'yr' in ai and getattr(self, ai) is not None:
                 setattr(self, ai, '{:04d}'.format(int(getattr(self, ai))))
 
         if(interactive or tk_select):
