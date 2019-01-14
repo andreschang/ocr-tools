@@ -14,6 +14,7 @@ from ocrtools.tk_selector import plt
 import cf_units
 from datetime import date, datetime
 
+
 def spatial_average(data, cell_area=None):
     """
     Returns approximate spatial average of 3D data

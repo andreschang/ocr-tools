@@ -36,7 +36,7 @@ def xr_load(path, average=True, datetime64=True):
     # Convert to datetime64 for compatibility with Pandas later
     if calendar != 'standard' and datetime64:
         to_num = np.add(cf_units.date2num(t0, 'days since 0002-01-01 00:00:00',
-                        cf_units.CALENDAR_STANDARD), np.ones(t0.shape))
+                        cf_units.CALENDAR_NO_LEAP), np.ones(t0.shape))
         to_cal = [date.fromordinal(int(n)).isoformat() for n in to_num]
         t0 = np.array(to_cal, dtype='datetime64[ns]')
 
@@ -189,7 +189,7 @@ def subset(dataset, scope):
 
     # First subset year range
     t0 = scope.yr0+'-01-01' if scope.yr0 is not None else np.min(dataset['time'])
-    tf = scope.yrf+'-01-01' if scope.yrf is not None else np.max(dataset['time'])
+    tf = scope.yrf+'-12-31' if scope.yrf is not None else np.max(dataset['time'])
     d_subset = dataset.sel(time=slice(t0, tf))
 
     def box_subset(d_in, lat_min, lat_max, lon_min, lon_max):
