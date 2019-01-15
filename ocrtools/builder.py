@@ -20,17 +20,19 @@ scope = ocr.scope()
 TS2 = ocr.spatial_average(ocr.subset(TS2, scope))
 TS5 = ocr.spatial_average(ocr.subset(TS5, scope))
 
-for i in range(5):
-    for j in range(4):
-        if i == 4 and j == 1:
-            debug = True
-        else:
-            debug = False
-        snap = (i) * 3
-        cs = j + 1
+ocr.save_reformatted(TS2, dt=dt, pre='test', id='002')
 
-        TS_build = ocr.build(
-            TS5, dt, TS2, combine_steps=cs, plot=True, snap=snap, debug=debug, debug_step=15,
-            head=2, tail=2).new
-        plt.savefig('TS_base_test_peru.snap'+str(snap)+'.cs'+str(cs)+'.png', dpi=fig_dpi)
-        plt.clf()
+# for i in range(5):
+#     for j in range(4):
+#         if i == 4 and j == 1:
+#             debug = True
+#         else:
+#             debug = False
+#         snap = (i) * 3
+#         cs = j + 1
+
+#         TS_build = ocr.build(
+#             TS5, dt, TS2, combine_steps=cs, plot=True, snap=snap, debug=debug, debug_step=15,
+#             head=2, tail=2).new
+#         plt.savefig('TS_base_test_peru.snap'+str(snap)+'.cs'+str(cs)+'.png', dpi=fig_dpi)
+#         plt.clf()

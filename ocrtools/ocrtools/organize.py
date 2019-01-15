@@ -18,6 +18,8 @@ cesm_fname = ['compset', 'code_base', 'compset_short', 'res_short', 'desc',
               'nnn', 'scomp', 'type', 'string', 'date', 'ending']
 cesmLE_map = {'compset': 'b', 'code_base': 'e11', 'res_short': 'f09_g16',
               'ending': 'nc'}
+formatted_fname = ['pre', 'all_var', 'yr_range', 'dt', 'id', 'post', 'ending']
+
 top_directory = '/Volumes/Samsung_T5/Open_Climate_Research-Projects/data'
 
 
@@ -45,7 +47,7 @@ pop = rcsv(os.path.join(os.path.dirname(__file__),
 pop_vars = [itm[3] for itm in pop]
 
 
-def gen_path(path_map, path_info, join='/', top=''):
+def gen_path(path_map, path_info, join='/', top='', **kwargs):
     """
     Returns a path
     Args:
@@ -57,7 +59,7 @@ def gen_path(path_map, path_info, join='/', top=''):
             top = top_directory + '/'
         except NameError:
             top = ''
-    elif top is '':
+    elif top == '':
         top = ''
     else:
         top = top + '/'
@@ -237,4 +239,58 @@ def load_cesmLE(var, dt, yr0, yrf, mem, **kwargs):
     return(xr.concat(load_cesm, 'time').sel(time=slice(t0, tf)))
 
 
-# Additional functions to be written -- save_formatted
+def save_reformatted(data, dt, **kwargs):
+    """Saves reformatted dataset in the right place w the right name"""
+
+    try:
+        directory = (kwargs['directory'] if kwargs['directory'].endswith('/')
+                     else kwargs['directory'] + '/')
+        mkdir_p(directory)
+        fullpath = directory + reformatted_fname(data, dt, False, **kwargs)
+    except KeyError:
+        fullpath = reformatted_fname(data, dt, True, **kwargs)
+        mkdir_p('/'.join(fullpath.split('/')[0:-1]))
+
+    data.to_netcdf(path=fullpath)
+    print('\n[OCR] Saved reformatted data to '+fullpath)
+
+
+def reformatted_fname(dataset, dt, dpath=True, **kwargs):
+    """ Generates a filename for reformatted dataset"""
+
+    if dpath:
+        print('\n[OCR] Generating reformatted data filename and path')
+    else:
+        print('\n[OCR] Generating reformatted data filename')
+
+    time_range = dataset.coords['time'].to_index()
+    yr0 = "{:04d}".format(np.amin(time_range).year)
+    yrf = "{:04d}".format(np.amax(time_range).year)
+    fname_dict = {'all_var': '_'.join(dataset.attrs['main_vars']),
+                  'yr_range': yr0 + '-' + yrf, 'dt': dt, 'ending': 'nc'}
+
+    try:
+        fname_dict['pre'] = kwargs["pre"]
+    except KeyError:
+        pass
+    try:
+        fname_dict['post'] = kwargs["post"]
+    except KeyError:
+        pass
+    try:
+        fname_dict['id'] = kwargs["id"]
+    except KeyError:
+        pass
+
+    path0 = gen_path(formatted_fname, fname_dict, '.')
+
+    if dpath:
+        dpath_dict = {'type': 'reformatted', 'dt': dt,
+                      'var': fname_dict['all_var'], 'file': path0}
+        try:
+            dpath_dict['src'] = kwargs['src']
+        except KeyError:
+            dpath_dict['src'] = input('Please enter data src: ')
+        path0 = gen_path(directory_map, dpath_dict, '/', top=None)
+
+    return(path0)

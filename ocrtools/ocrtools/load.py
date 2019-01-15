@@ -296,3 +296,4 @@ class scope(object):
 
         if(interactive or tk_select):
             print("\n[OCR] Finished writing new scope object")
+
