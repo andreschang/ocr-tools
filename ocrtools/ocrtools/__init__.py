@@ -12,4 +12,4 @@ from ocrtools.load import *
 from ocrtools.tk_selector import *
 from ocrtools.explore import *
 from ocrtools.organize import *
-from ocrtools.build2 import *
+from ocrtools.build import *
