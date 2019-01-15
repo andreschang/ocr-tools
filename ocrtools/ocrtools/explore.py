@@ -60,6 +60,7 @@ def spatial_average(data, cell_area=None, **kwargs):
 
     if dataset_in:
         weighted_mean = weighted_mean.to_dataset(dim='variable')
+    weighted_mean.attrs = data.attrs
 
     return(weighted_mean)
 

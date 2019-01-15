@@ -221,6 +221,7 @@ def subset(dataset, scope):
         d_subset = d_subset.where(d_subset.z <= scope.z_max, drop=True)
     if 'z_min' in scope_keys:
         d_subset = d_subset.where(d_subset.z >= scope.z_min, drop=True)
+    d_subset.attrs = dataset.attrs
     print('\n[OCR] Subset complete. Dataset contents:')
     print(d_subset)
 

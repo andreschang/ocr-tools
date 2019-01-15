@@ -147,6 +147,14 @@ class build(object):
             plot = kwargs["plot"]
         except KeyError:
             plot = False
+        try:
+            debug = kwargs["debug"]
+        except KeyError:
+            debug = False
+        try:
+            debug_step = kwargs["debug_step"]
+        except KeyError:
+            debug_step = 0
 
         main_vars = data1.attrs['main_vars']
         nvars = len(main_vars)
@@ -175,37 +183,37 @@ class build(object):
         # (ex. january or mean(january, february))
         # blur std is standard dev of each "combine_steps" segment
         # (ex. january (0) or std(january, february) year 0)
-        ac1 = (data1.resample(time=str(combine_steps)+fby, keep_attrs=True)
+        d1 = (data1.resample(time=str(combine_steps)+fby, keep_attrs=True)
                    .mean('time').dropna('time', how='all'))
         d1_step_std, d1_blur_std = get_stds(data1, dt, **kwargs)
         if plot:
-            plot_sa(ac1, 1)
+            plot_sa(d1, 1)
 
         # Do the same for data2 if given, otherwise refer always to data1
         if data2 is not None:
-            ac2 = (data2.resample(time=str(combine_steps)+fby, keep_attrs=True)
+            d2 = (data2.resample(time=str(combine_steps)+fby, keep_attrs=True)
                    .mean('time').dropna('time', how='all'))
             d2_step_std, d2_blur_std = get_stds(data2, dt, **kwargs)
-            if plot: plot_sa(ac2, 2)
+            if plot: plot_sa(d2, 2)
 
-            d12 = xr.concat([ac1, ac2], 'scenario')
+            d12 = xr.concat([d1, d2], 'scenario')
             max0, min0 = np.amax(d12), np.amin(d12)
             step_std = (d1_step_std + d2_step_std)/2
             blur_std = (d1_blur_std + d2_blur_std)/2
             self.base_data = d12.mean('scenario')
         else:
-            self.base_data = ac1
+            self.base_data = d1
             max0, min0 = np.amax(data1), np.amin(data1)
             step_std, blur_std = d1_step_std, d1_blur_std
         base_ac = self.base_data.groupby(by).mean('time')
+        d1_group = d1.groupby(by).mean('time')
 
         # Calculate full range of input data
         d_range = max0 - min0
 
-        # Absolute 'full_step' is calculated, which is the change between
-        # div(i~), yr0 and div(i~+1), yrf. Where i~ here means the full
-        # 'combine_steps' div. Ex. January 1-5 1995, January 6-10 2000.
-        # Opt steps is the full step divided by number of years
+        # opt_step is the variable delta between timesteps based on 1) standard
+        # annual cycle of data1 and 2) affect of scenario choice on overall
+        # variable between data1 and data12
 
         time_range = data1.coords['time'].to_index()
         yr0, yrf = np.amin(time_range).year, np.amax(time_range).year
@@ -225,17 +233,20 @@ class build(object):
                                      "{:04d}".format(yrf) + '-12-31')),
                 dt, **kwargs)
 
-        full_steps = d_yrf - d_yr0.roll({t_dim: 1}, roll_coords=True)
-        opt_steps = full_steps/(yrf-yr0)
+        d1_steps = d1_group.roll({t_dim: -1}, roll_coords=False) - d1_group
+        full_steps = d_yrf.roll({t_dim: -1}, roll_coords=False) - d_yr0
+        opt_steps = d1_steps + (full_steps - d1_steps)/(yrf - yr0 + 1)
         self.rand = []
         self.snap_list = []
         out_vars = []
 
+        if debug:
+            print(opt_steps)
+
         for vi in range(nvars):
             var_i = main_vars[vi]
             new_var = (
-                data1[var_i].copy(deep=True)
-                            .resample(time=str(combine_steps) + fby,
+                data1[var_i].resample(time=str(combine_steps) + fby,
                                       keep_attrs=True)
                             .mean('time')
                             .dropna('time', how='all')
@@ -250,8 +261,15 @@ class build(object):
                     t_attr = 'month'
 
                 # Step is calculated based on previous plus opt_step
-                new_step = (new_var.isel(time=i) + opt_steps[var_i].sel(
+                new_step = ((new_var.isel(time=i).copy(deep=True) + opt_steps[var_i].sel(
                         {t_dim: getattr(ctime[i], t_attr)}))
+                                   .assign_coords(time=xr.DataArray(ctime[i+1])))
+
+                if debug and i == debug_step:
+                    print('\n[OCR debug] Date of loop: '+str(ctime[i]) +
+                          ', Date of replacement '+str(ctime[i+1]))
+                    print('[OCR debug] New_step from opt_step sum')
+                    print(new_step)
                 # Some standard deviation added based on average of std for
                 # step i and step i+1
 
@@ -269,30 +287,47 @@ class build(object):
                 else:
                     if vi == 0:
                         r1, r2 = np.random.normal(), np.random.normal()
-                        self.rand.append((r1, r2))
                     else:
                         r1, r2 = self.rand[i]
+                self.rand.append((r1, r2))
 
                 new_step = (new_step + r1 * add_step_std * step_std_a/50. +
                              r2 * add_blur_std * blur_std_a/50.)
 
-                # Normalize snapping envelope to 5 standard deviations
-                dev_from_base = (new_step - base_ac[var_i].sel(
-                    {t_dim: getattr(ctime[i+1], t_attr)})).apply(
-                        np.abs)/(add_step_std * (15-snap))
-                dev_from_base = dev_from_base.where(dev_from_base > 1, 1)
-                snap_amt = dev_from_base**((50 - snap_atten)/5)
-                self.snap_list.append(snap_amt)
+                if debug and i == debug_step:
+                    print('[OCR debug] New_step after the addition of randomness')
+                    print(new_step)
 
-                new_step = (
-                    snap_amt * self.base_data[var_i].sel({'time': ctime[i+1]}) +
-                    (1 - snap_amt) * new_step)
+                # Normalize snapping envelope to 5 standard deviations
+                # dev_from_base = (new_step - base_ac[var_i].sel(
+                #     {t_dim: getattr(ctime[i+1], t_attr)})).apply(
+                #         np.abs)/(add_step_std * (15-snap))
+                # dev_from_base = dev_from_base.where(dev_from_base > 1, 1)
+                # snap_amt = dev_from_base**((50 - snap_atten)/5)
+                # self.snap_list.append(snap_amt)
+
+                # new_step = (
+                #     snap_amt * self.base_data[var_i].sel({'time': ctime[i+1]}) +
+                #     (1 - snap_amt) * new_step)
+
+                # if debug:
+                #     print('[OCR debug] New_step after snapping')
+                #     print(new_step)
 
                 # Replace variables that exceed min or max with min/max values
                 new_step = filter_minmax(new_step, var_i, var_min, var_max)
 
+                if debug and i == debug_step:
+                    print('[OCR debug] New_step after filter_minmax')
+                    print(new_step)
+
                 # modify the array!
-                new_var = new_var.where(new_step != new_var, new_step)
+                mask = (new_var.coords['time'] == xr.DataArray(ctime[i+1]))
+
+                new_var = xr.where(mask, new_step, new_var)
+                if debug and i == debug_step:
+                    print('Replaced new step looks like: ')
+                    print(new_var)
 
             # enhance contrast
             if hist_stretch:
@@ -322,18 +357,16 @@ class build(object):
             if combine_steps > 1:
                 new_var = new_var.resample(time=fby).interpolate()
 
-            new_var = new_var.to_array(name=var_i).squeeze()
-            print(new_var)
+            # new_var = new_var.to_array(name=var_i).squeeze()
+            # print(new_var)
             
             out_vars.append(new_var)
-            if plot:
-                if nvars == 1:    
-                    spatial_average(new_var).plot(ax=ax0, label='new')
-                    ax0.legend(loc='best')
-                else:
-                    spatial_average(new_var).plot(ax=ax0[vi], label='new')
 
         new_ds = xr.merge(out_vars)
+        new_ds.attrs = data1.attrs
+        if plot:
+            plot_sa(new_ds, 'new')
+            plt.legend(loc='best')
         # plt.show()
         # plt.clf()
         self.new = new_ds
