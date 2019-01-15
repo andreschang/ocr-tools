@@ -14,13 +14,14 @@ import xarray as xr
 
 dt = 'monthly'
 fig_dpi = 200
-TS2 = ocr.load_cesmLE('TS', dt, yr0=2008, yrf=2020, mem=2)
-TS5 = ocr.load_cesmLE('TS', dt, yr0=2008, yrf=2020, mem=5)
-scope = ocr.scope()
+TS2 = ocr.load_cesmLE('TS', dt, mem=2, yr0=2000, yrf=2004)
+TS5 = ocr.load_cesmLE('TS', dt, mem=5, yr0=2000, yrf=2004)
+scope = ocr.scope(location='Lima, Peru')
 TS2 = ocr.spatial_average(ocr.subset(TS2, scope))
 TS5 = ocr.spatial_average(ocr.subset(TS5, scope))
+print(TS2)
 
-ocr.save_reformatted(TS2, dt=dt, pre='test', id='002')
+# ocr.save_reformatted(TS2, dt=dt, pre='test', id='002')
 
 # for i in range(5):
 #     for j in range(4):

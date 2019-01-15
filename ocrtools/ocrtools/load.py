@@ -213,9 +213,15 @@ def subset(dataset, scope):
         d_subset = xr.merge(box_subs)
 
     except AttributeError:
-        # Subset based on coordinat min/max
-        d_subset = box_subset(d_subset, scope.lat_min, scope.lat_max,
-                              scope.lon_min, scope.lon_max)
+        try:
+            # subset based on location
+            d_subset = d_subset.sel(
+                lat=scope.lat, lon=scope.lon, method='nearest')
+
+        except AttributeError:
+            # Subset based on coordinat min/max
+            d_subset = box_subset(d_subset, scope.lat_min, scope.lat_max,
+                                  scope.lon_min, scope.lon_max)
 
     if 'z_max' in scope_keys:
         d_subset = d_subset.where(d_subset.z <= scope.z_max, drop=True)
@@ -242,7 +248,8 @@ class scope(object):
     def __init__(self, interactive=True, tk_select=True, prime_meridian=0,
                  **kwargs):
 
-        scopes = ['yr0', 'yrf', 'lat_min', 'lat_max', 'lon_min', 'lon_max']
+        scopes = ['yr0', 'yrf', 'lat_min', 'lat_max', 'lon_min', 'lon_max',
+                  'location']
         none_vals = {'lat_min': -90, 'lat_max': 90, 'lon_min': -180,
                      'lon_max': 180, 'yr0': None, 'yrf': None}
 
@@ -254,6 +261,9 @@ class scope(object):
         # map window and prompt the user select area with rectangles
         if all(x not in kwargs for x in scopes[2:]) and tk_select:
             scopes = scopes[0:2] + ['tk_selection']
+        elif 'location' in kwargs:
+            self.location = kwargs['location']
+            scopes = scopes[0:2] + [scopes[-1]]
 
         try:
             if(kwargs['z_min']):
@@ -272,7 +282,12 @@ class scope(object):
                       " pop-up window")
                 from ocrtools.tk_selector import get_dims
                 setattr(self, ai, get_dims())
-
+            elif ai == 'location':
+                from geopy import Nominatim
+                geolocator = Nominatim()
+                geo_loc = geolocator.geocode(self.location)
+                self.lat = geo_loc.latitude
+                self.lon = geo_loc.longitude + 180
             else:
                 try:
                     setattr(self, ai, kwargs[ai])

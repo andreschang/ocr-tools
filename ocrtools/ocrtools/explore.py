@@ -24,45 +24,48 @@ def spatial_average(data, cell_area=None, **kwargs):
     * cell_area (data_array): array of cell areas
     """
 
-    try:
-        d0 = data.to_array()
-        dataset_in = True
-    except AttributeError:
-        d0 = data
-        dataset_in = False
+    if 'lat' not in data.dims and 'lon' not in data.dims:
+        return(data)
+    else:
+        try:
+            d0 = data.to_array()
+            dataset_in = True
+        except AttributeError:
+            d0 = data
+            dataset_in = False
 
-    if len(d0['lat'].shape) == 1:
-        lat_weights = xr.DataArray(
-            reg_wgt(np.min(d0['lat']), np.max(d0['lat']),
-                    d0['lat'].shape[0]), coords=[('lat', d0['lat'])])
+        if len(d0['lat'].shape) == 1:
+            lat_weights = xr.DataArray(
+                reg_wgt(np.min(d0['lat']), np.max(d0['lat']),
+                        d0['lat'].shape[0]), coords=[('lat', d0['lat'])])
 
-        # If dataset contains NaN values, calculate average of cell value,
-        # weighted by latitude
-        if np.sum(np.isnan(d0)) > 0:
-            cell_weights = lat_weights * d0['lat'].shape[0] / np.sum(
-                np.isfinite(d0.isel(variable=0, time=0)))
-            weighted_mean = (d0 * cell_weights).sum(dim=['lat', 'lon'])
+            # If dataset contains NaN values, calculate average of cell value,
+            # weighted by latitude
+            if np.sum(np.isnan(d0)) > 0:
+                cell_weights = lat_weights * d0['lat'].shape[0] / np.sum(
+                    np.isfinite(d0.isel(variable=0, time=0)))
+                weighted_mean = (d0 * cell_weights).sum(dim=['lat', 'lon'])
 
-        # Otherwise, zonal mean and then weighted meridional mean (faster)
-        else:
-            zonal_mean = d0.mean(dim='lon')
-            weighted_mean = zonal_mean.dot(lat_weights)
+            # Otherwise, zonal mean and then weighted meridional mean (faster)
+            else:
+                zonal_mean = d0.mean(dim='lon')
+                weighted_mean = zonal_mean.dot(lat_weights)
 
-    elif len(d0['lat'].shape) == 2:
-        if cell_area is None:
-            raise ValueError('Cell area must be defined as a function arg',
-                             ' to calculate spatial average of a variable',
-                             ' across a curvilinear grid')
-        else:
-            weighted_mean = (
-                d0 * cell_area/cell_area.sum()).sum(
-                dim=[n for n in d0.dims if n != 'time' and n != 'variable'])
+        elif len(d0['lat'].shape) == 2:
+            if cell_area is None:
+                raise ValueError('Cell area must be defined as a function arg',
+                                 ' to calculate spatial average of a variable',
+                                 ' across a curvilinear grid')
+            else:
+                weighted_mean = (
+                    d0 * cell_area/cell_area.sum()).sum(
+                    dim=[n for n in d0.dims if n != 'time' and n != 'variable'])
 
-    if dataset_in:
-        weighted_mean = weighted_mean.to_dataset(dim='variable')
-    weighted_mean.attrs = data.attrs
+        if dataset_in:
+            weighted_mean = weighted_mean.to_dataset(dim='variable')
+        weighted_mean.attrs = data.attrs
 
-    return(weighted_mean)
+        return(weighted_mean)
 
 
 def reg_wgt(latmin, latmax, nlat):
