@@ -42,7 +42,7 @@ def xr_load(path, average=True, datetime64=True):
         if calendar == 'noleap':
             add = np.ones(t0.shape)
         elif calendar == 'proleptic_gregorian':
-            add = np.ones(t0.shape) * 365
+            add = np.ones(t0.shape) * 366
 
         to_num = np.add(cf_units.date2num(t0, 'days since 0002-01-01 00:00:00',
                         calendar), add)

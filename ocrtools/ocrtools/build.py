@@ -132,6 +132,8 @@ class build(object):
         snap_atten = try_dict(kwargs, 'snap_atten', 20, main_vars)
         snap_atten = {k: 50 if v > 50 else v for k, v in snap.items()}
         hist_stretch = try_dict(kwargs, 'hist_stretch', False, main_vars)
+        hist_args = try_dict(kwargs, 'hist_args', False, {})
+        savgol_window = try_dict(kwargs, 'savgol_window', 1, main_vars)
 
         def none_dist(x):
             return(x)
@@ -152,12 +154,21 @@ class build(object):
             if nvars == 1:
                 sa[main_vars[0]].plot(ax=ax0, label='Scenario '+str(n))
                 ax0.legend(loc='best')
-                ax0.set_title('OCR Build '+main_vars[0])
+                # ax0.set_title('OCR Build '+main_vars[0])
             else:
                 for vi in range(nvars):
                     sa[main_vars[vi]].plot(ax=ax0[vi], label='Scenario '+str(n))
                     ax0[vi].legend(loc='best')
-                    ax0[vi].set_title('OCR Build '+main_vars[vi])
+                    # ax0[vi].set_title('OCR Build '+main_vars[vi])
+
+
+        def apply_savgol(dataset):
+            for var in main_vars:
+                dataset[var] = xr.DataArray(signal.savgol_filter(
+                    dataset[var], savgol_window[var], 2,
+                    axis=dataset[var].get_axis_num('time')),
+                    coords=dataset[var].coords, dims=dataset[var].dims)
+            return(dataset)
 
 
         # Get annual cycle and standard dev params of data1
@@ -168,6 +179,8 @@ class build(object):
         # (ex. january (0) or std(january, february) year 0)
         d1 = (data1.resample(time=str(combine_steps)+fby, keep_attrs=True)
                    .mean('time').dropna('time', how='all'))
+        d1 = apply_savgol(d1)
+
         d1_step_std, d1_blur_std = get_stds(data1, dt, **kwargs)
         if plot:
             plot_sa(d1, 1)
@@ -176,6 +189,7 @@ class build(object):
         if data2 is not None:
             d2 = (data2.resample(time=str(combine_steps)+fby, keep_attrs=True)
                        .mean('time').dropna('time', how='all'))
+            d2 = apply_savgol(d2)
             d2_step_std, d2_blur_std = get_stds(data2, dt, **kwargs)
             if plot: plot_sa(d2, 2)
 
@@ -202,23 +216,24 @@ class build(object):
         yr0, yrf = np.amin(time_range).year, np.amax(time_range).year
         d_yr0 = annual_cycle(
             data1.sel(time=slice("{:04d}".format(yr0) + '-01-01',
-                                 "{:04d}".format(yr0 + head) + '-12-31')),
+                                 "{:04d}".format(yr0 + head-1) + '-12-31')),
             dt, **kwargs)
 
         if data2 is not None:
             d_yrf = annual_cycle(
-                data2.sel(time=slice("{:04d}".format(yrf - tail) + '-01-01',
+                data2.sel(time=slice("{:04d}".format(yrf - tail+1) + '-01-01',
                                      "{:04d}".format(yrf) + '-12-31')),
                 dt, **kwargs)
         else:
             d_yrf = annual_cycle(
-                data1.sel(time=slice("{:04d}".format(yrf - tail) + '-01-01',
+                data1.sel(time=slice("{:04d}".format(yrf - tail+1) + '-01-01',
                                      "{:04d}".format(yrf) + '-12-31')),
                 dt, **kwargs)
 
         d1_steps = d1_group.roll({t_dim: -1}, roll_coords=False) - d1_group
         full_steps = d_yrf.roll({t_dim: -1}, roll_coords=False) - d_yr0
         opt_steps = d1_steps + a * (full_steps - d1_steps)/(yrf - yr0 + 1)
+
         self.rand = []
         self.snap_list = []
         out_vars = []
@@ -232,21 +247,20 @@ class build(object):
                 data1[var].copy(deep=True).resample(time=str(combine_steps) + fby,
                                       keep_attrs=True)
                             .mean('time')
-                            .dropna('time', how='all')
-                        )
+                            .dropna('time', how='all'))
 
-            print(new_var)
             ctime = new_var.coords['time'].to_index()
 
             for i in range(len(new_var['time']) - 1):
                 if dt == 'daily':
-                    t_attr = 'day'
+                    t_attr = 'dayofyear'
                 elif dt == 'monthly':
                     t_attr = 'month'
 
                 # Step is calculated based on previous plus opt_step
+
                 new_step = ((new_var.isel(time=i).copy(deep=True) + opt_steps[var].sel(
-                        {t_dim: getattr(ctime[i], t_attr)}))
+                        {t_dim: getattr(ctime[i], t_attr)}, method='nearest'))
                                    .assign_coords(time=xr.DataArray(ctime[i+1])))
 
                 if debug and i == debug_step:
@@ -254,6 +268,12 @@ class build(object):
                           ', Date of replacement '+str(ctime[i+1]))
                     print('[OCR debug] New_step from opt_step sum')
                     print(new_step)
+                    print('from sum of')
+                    print((new_var.isel(time=i).copy(deep=True)))
+                    print('and')
+                    print(opt_steps[var].sel(
+                        {t_dim: getattr(ctime[i], t_attr)}, method='nearest'))
+
                 # Some standard deviation added based on average of std for
                 # step i and step i+1
 
@@ -283,22 +303,29 @@ class build(object):
                     print(new_step)
 
                 # Normalize snapping envelope to 5 standard deviations default
-                dev_from_base = (np.abs(
-                    new_step - base_ac[var].sel(
-                        {t_dim: getattr(ctime[i+1], t_attr)})) /
-                    (add_step_std * (15-snap[var])))
+                # unless snap is 0
+                if snap[var] == 0:
+                    snap_amt = 0
+                else:
+                    dev_from_base = (np.abs(
+                        new_step - base_ac[var].sel(
+                            {t_dim: getattr(ctime[i+1], t_attr)})) /
+                        (add_step_std * (15-snap[var])))
 
-                dev_from_base = xr.where(dev_from_base > 1, 1, dev_from_base)
-                snap_amt = dev_from_base**((50 - snap_atten[var])/5)
+                    dev_from_base = xr.where(dev_from_base > 1, 1, dev_from_base)
+                    dev_from_base = xr.where(np.isnan(dev_from_base), 1, dev_from_base)
+                    snap_amt = dev_from_base**((50 - snap_atten[var])/5)
+                    new_step = (
+                        snap_amt * self.base_data[var].sel({'time': ctime[i+1]}) +
+                        (1 - snap_amt) * new_step)
+
                 self.snap_list.append(snap_amt)
-
-                new_step = (
-                    snap_amt * self.base_data[var].sel({'time': ctime[i+1]}) +
-                    (1 - snap_amt) * new_step)
 
                 if debug and i == debug_step:
                     print('[OCR debug] New_step after snapping')
                     print(new_step)
+                    print(' by amount ')
+                    print(snap_amt)
 
                 # Replace variables that exceed min or max with min/max values
                 new_step = filter_minmax(new_step, var_min[var], var_max[var])
@@ -311,15 +338,13 @@ class build(object):
                 mask = (new_var.coords['time'] == xr.DataArray(ctime[i+1]))
 
                 new_var = xr.where(mask, new_step, new_var)
+
                 if debug and i == debug_step:
                     print('Replaced new step looks like: ')
                     print(new_var)
-            # print(new_var)
 
             # enhance contrast
             if hist_stretch[var]:
-                if debug:
-                    print('\n[OCR debug] Starting hist_stretch')
                 # Histogram stretching only supported for spatially averaged
                 # data at the moment
                 in_mean = new_var.mean('time')
@@ -330,20 +355,24 @@ class build(object):
                 if var_min[var] is not None:
                     out_min = var_min[var]
                 else:
-                    out_min = min0[var]
+                    out_min = min0[var].item()
                 if var_max[var] is not None:
                     out_max = var_max[var]
                 else:
                     out_max = max0[var]
 
+                if debug:
+                    print('\n[OCR debug] Starting hist_stretch. Min/max: ')
+                    print(out_min, out_max)
+
                 hist_var = (c_dist[var](
                     ((new_var - contrast_lims[0]) /
-                     c_range)) * (out_max - out_min) + out_min)
+                     c_range), **hist_args[var]) * (out_max - out_min) + out_min)
 
                 cond = xr.DataArray((new_var > contrast_lims[0]) &
                                     (new_var < contrast_lims[1]), dims=['time'])
                 new_var = xr.where(cond, hist_var, new_var)
-                # new_var = filter_minmax(new_var, var_min[var], var_max[var])
+                new_var = filter_minmax(new_var, var_min[var], var_max[var])
 
             if combine_steps > 1:
                 new_var = new_var.resample(time=fby).interpolate()
@@ -403,6 +432,6 @@ def get_groupings(dt):
         by = 'time.month'
         fby = 'MS'
     elif dt == 'daily':
-        by = 'time.day'
+        by = 'time.dayofyear'
         fby = 'D'
     return(by, fby)
