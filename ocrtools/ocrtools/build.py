@@ -335,30 +335,31 @@ class build(object):
                     print(new_var)
 
             # enhance contrast
-            # if hist_stretch:
-            #     in_mean = new_var.mean('time')
-            #     in_std = new_var.std('time')
-            #     contrast_lims = [in_mean-in_std, in_mean+in_std]
-            #     c_range = contrast_lims[1]-contrast_lims[0]
+            if hist_stretch:
+                in_mean = new_var.mean('time')
+                in_std = new_var.std('time')
+                contrast_lims = [in_mean-in_std, in_mean+in_std]
+                c_range = contrast_lims[1]-contrast_lims[0]
 
-            #     if var_min is not None:
-            #         out_min = var_min
-            #     else:
-            #         out_min = min0
-            #     if var_max is not None:
-            #         out_max = var_max
-            #     else:
-            #         out_max = max0
+                if var_min is not None:
+                    out_min = var_min
+                else:
+                    out_min = min0
+                if var_max is not None:
+                    out_max = var_max
+                else:
+                    out_max = max0
 
-            #     # print('\n\n\nHIST CALC')
-            #     hist_var = (c_dist(
-            #         ((new_var - contrast_lims[0]) /
-            #          c_range)) * (out_max - out_min) + out_min)
-            #     # print(hist_var)
+                # print('\n\n\nHIST CALC')
+                hist_in = ((new_var - contrast_lims[0]) /
+                           c_range)
+                hist_var = (c_dist(
+                    ((new_var - contrast_lims[0]) /
+                     c_range)) * (out_max - out_min) + out_min)
 
-            #     new_var = xr.where(
-            #         new_var > contrast_lims[0] and new_var < contrast_lims[1],
-            #         hist_var, new_var)
+                new_var = xr.where(
+                    new_var > contrast_lims[0] and new_var < contrast_lims[1],
+                    hist_var, new_var)
 
             if combine_steps > 1:
                 new_var = new_var.resample(time=fby).interpolate()

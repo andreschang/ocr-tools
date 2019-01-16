@@ -32,30 +32,15 @@ def p2(x, x0=0.7, steepness=5):
     dice0 = 0.18
     dice_a = 4.4
     d_mult = dice_a/dice0
-    print('AAAAA')
 
-    try:
-        roll_dice = np.random.rand(x.dims)
-        x_else = ((1/(1-x0))*(x-x0))**steepness
-        x_roll_under = roll_dice * dice_a
-        x_roll_over = 0
+    roll_dice = np.random.rand(x.dims['time'])
+    x_else = ((1/(1-x0))*(x-x0))**steepness
+    x_roll_under = roll_dice * dice_a
+    x_roll_over = 0
 
-        x_roll = xr.where(roll_dice < dice0, x_roll_under, x_roll_over)
-        xf = xr.where(x < x0, x_roll, x_else)
-        return(xf)
-
-    except TypeError:
-        print(x)
-        if x < x0:
-            roll_dice = np.random.random()
-            if roll_dice < dice0:
-                print(roll_dice*dice_a)
-                return roll_dice*dice_a
-            else:
-                return 0
-        else:
-            print(((1/(1-x0))*(x-x0))**steepness)
-            return ((1/(1-x0))*(x-x0))**steepness
+    x_roll = xr.where(roll_dice < dice0, x_roll_under, x_roll_over)
+    xf = xr.where(x < x0, x_roll, x_else)
+    return(xf)
 
 
 def print_dist(dist):

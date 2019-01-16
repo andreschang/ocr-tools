@@ -33,19 +33,19 @@ fig_dpi = 200
 show_snap = True
 
 # Build settings
-n_build = 2
+n_build = 5
 step_std_a = {'PRECT': 8, 'TS': 13, 'RAIN': 8}
 blur_std_a = {'PRECT': 8, 'TS': 22, 'RAIN': 8}
 combine_steps = 1
 a_range = [1, 2.5]
-snap = {'PRECT': 11.5, 'TS': 9.5, 'RAIN': 2}
+snap = {'PRECT': 11.5, 'TS': 9.5, 'RAIN': 8}
 snap_curve = {'PRECT': 8, 'TS': 10, 'RAIN': 8}
 savgol_window = {'PRECT': 5, 'TS': 3, 'RAIN': 5}
 head = 3
 tail = 3
 combine_plots = False
-hist_stretch = {'PRECT': True, 'TS': False, 'RAIN': False}
-hist_dist = {'PRECT': p2, 'TS': False, 'RAIN': False}
+hist_stretch = {'PRECT': True, 'TS': False, 'RAIN': True}
+hist_dist = {'PRECT': p2, 'TS': False, 'RAIN': p2}
 
 # Style settings
 colors = ["#94B4DE", "#1E44D9", "#C71303", "#710F3F"]
