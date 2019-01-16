@@ -18,7 +18,7 @@ cesm_fname = ['compset', 'code_base', 'compset_short', 'res_short', 'desc',
               'nnn', 'scomp', 'type', 'string', 'date', 'ending']
 cesmLE_map = {'compset': 'b', 'code_base': 'e11', 'res_short': 'f09_g16',
               'ending': 'nc'}
-formatted_fname = ['pre', 'all_var', 'yr_range', 'dt', 'id', 'post', 'ending']
+formatted_fname = ['pre', 'all_vars', 'yr_range', 'dt', 'id', 'post', 'ending']
 
 top_directory = '/Volumes/Samsung_T5/Open_Climate_Research-Projects/data'
 
@@ -77,7 +77,7 @@ def cesmLE_fname(var, dt, yr0, mem=0, hem=''):
     * dt (str): monthly or daily
     * yr0 (numeric): first year of data file
     * mem (numeric): member number (if 0, defaults to 002 for BAU runs; and
-    all control runs are 005)
+    all control runs are 1850)
     * hem (str): cice variables need to be specified as 'nh' or 'sh'
     """
 
@@ -87,7 +87,8 @@ def cesmLE_fname(var, dt, yr0, mem=0, hem=''):
         cesm_d['compset_short'] = 'B1850C5CN'
         yrf = yr0 + 99
         if mem == 0:
-            mem = 5
+            mem = 1850
+        cesm_d['nnn'] = '005'
     else:
         if mem == 0:
             mem = 2
@@ -101,7 +102,7 @@ def cesmLE_fname(var, dt, yr0, mem=0, hem=''):
             else:
                 yrf = 2100
 
-    cesm_d['nnn'] = '{:03d}'.format(mem)
+        cesm_d['nnn'] = '{:03d}'.format(mem)
 
     if dt == 'daily':
         cesm_d['date'] = ('{:04d}'.format(yr0) + '0101' + '-' +
@@ -193,17 +194,19 @@ def load_cesmLE(var, dt, yr0, yrf, mem, **kwargs):
     raw_cesm = {'type': 'raw', 'src': 'cesm', 'dt': dt, 'var': var}
     f0 = gen_path(directory_map, raw_cesm, top=None)
     raw_ncs = get_ncs(f0)
+
+    nnn = '{:03d}'.format(mem) if mem != 1850 else '005'
     raw_yr0 = [int(x.split('/')[-1]
                     .split('.')[-2]
                     .split('-')[0][0:4]) for x in raw_ncs if
                x.split('/')[-1]
-                .split('.')[4] == '{:03d}'.format(mem)]
+                .split('.')[4] == nnn]
 
     raw_yrf = [int(x.split('/')[-1]
                     .split('.')[-2]
                     .split('-')[1][0:4]) for x in raw_ncs if
                x.split('/')[-1]
-                .split('.')[4] == '{:03d}'.format(mem)]
+                .split('.')[4] == nnn]
 
     f_cesm = []
     f_yr0, f_yrf = yr0, -1
@@ -211,7 +214,7 @@ def load_cesmLE(var, dt, yr0, yrf, mem, **kwargs):
     while f_yrf < yrf:
         opts = [(x, y) for x, y in zip(raw_yr0, raw_yrf) if x <= f_yr0]
         if len(opts) == 0:
-            if mem == 5:
+            if mem == 1850:
                 guess_yr0 = round(yr0-50, -2)
             else:
                 if yr0 < 2006:
@@ -266,7 +269,7 @@ def reformatted_fname(dataset, dt, dpath=True, **kwargs):
     time_range = dataset.coords['time'].to_index()
     yr0 = "{:04d}".format(np.amin(time_range).year)
     yrf = "{:04d}".format(np.amax(time_range).year)
-    fname_dict = {'all_var': '_'.join(dataset.attrs['main_vars']),
+    fname_dict = {'all_vars': '_'.join(dataset.attrs['main_vars']),
                   'yr_range': yr0 + '-' + yrf, 'dt': dt, 'ending': 'nc'}
 
     try:
@@ -286,7 +289,7 @@ def reformatted_fname(dataset, dt, dpath=True, **kwargs):
 
     if dpath:
         dpath_dict = {'type': 'reformatted', 'dt': dt,
-                      'var': fname_dict['all_var'], 'file': path0}
+                      'var': fname_dict['all_vars'], 'file': path0}
         try:
             dpath_dict['src'] = kwargs['src']
         except KeyError:

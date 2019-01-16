@@ -135,10 +135,6 @@ class build(object):
         except KeyError:
             load_rand = None
         try:
-            savgol_window = kwargs["savgol_window"]
-        except KeyError:
-            savgol_window = 0
-        try:
             hist_stretch = kwargs["hist_stretch"]
         except KeyError:
             hist_stretch = False
@@ -250,7 +246,7 @@ class build(object):
         out_vars = []
 
         if debug:
-            print(opt_steps)
+            print('New loop', opt_steps)
 
         for vi in range(nvars):
             var_i = main_vars[vi]
@@ -339,29 +335,30 @@ class build(object):
                     print(new_var)
 
             # enhance contrast
-            if hist_stretch:
-                in_mean = new_var.mean('time')
-                in_std = new_var.std('time')
-                contrast_lims = [in_mean-in_std, in_mean+in_std]
-                c_range = contrast_lims[1]-contrast_lims[0]
-                print(c_range)
+            # if hist_stretch:
+            #     in_mean = new_var.mean('time')
+            #     in_std = new_var.std('time')
+            #     contrast_lims = [in_mean-in_std, in_mean+in_std]
+            #     c_range = contrast_lims[1]-contrast_lims[0]
 
-                if var_min is not None:
-                    out_min = var_min
-                else:
-                    out_min = min0
-                if var_max is not None:
-                    out_max = var_max
-                else:
-                    out_max = max0
+            #     if var_min is not None:
+            #         out_min = var_min
+            #     else:
+            #         out_min = min0
+            #     if var_max is not None:
+            #         out_max = var_max
+            #     else:
+            #         out_max = max0
 
-                hist_var = (((new_var - contrast_lims[0]) /
-                            c_range).apply(c_range) * (out_max - out_min)
-                            + out_min)
+            #     # print('\n\n\nHIST CALC')
+            #     hist_var = (c_dist(
+            #         ((new_var - contrast_lims[0]) /
+            #          c_range)) * (out_max - out_min) + out_min)
+            #     # print(hist_var)
 
-                new_var = new_var.where(
-                    new_var > contrast_lims[0] and new_var < contrast_lims[1],
-                    hist_var)
+            #     new_var = xr.where(
+            #         new_var > contrast_lims[0] and new_var < contrast_lims[1],
+            #         hist_var, new_var)
 
             if combine_steps > 1:
                 new_var = new_var.resample(time=fby).interpolate()
@@ -375,33 +372,36 @@ class build(object):
         new_ds.attrs = data1.attrs
         if plot:
             plot_sa(new_ds, 'new')
-        # plt.show()
-        # plt.clf()
         self.new = new_ds
 
 
 def filter_minmax(dataset, var_i, var_min, var_max):
+
     if var_min is not None:
         if isinstance(var_min, dict):
             try:
-                dataset = dataset.where(
-                    dataset < var_min[var_i], var_min[var_i])
+                dataset = xr.where(
+                    dataset < var_min[var_i], var_min[var_i],
+                    dataset)
             except KeyError:
                 pass
         else:
-            dataset = dataset.where(
-                dataset < var_min, var_min)
+            dataset = xr.where(
+                dataset < var_min, var_min,
+                dataset)
 
     if var_max is not None:
         if isinstance(var_max, dict):
             try:
-                if dataset < var_max[var_i]:
-                    dataset = var_max
+                dataset = xr.where(
+                    dataset > var_max[var_i], var_max[var_i],
+                    dataset)
             except KeyError:
                 pass
         else:
-            if dataset < var_max:
-                dataset = var_max
+            dataset = xr.where(
+                dataset > var_max, var_max,
+                dataset)
 
     return(dataset)
 

@@ -31,12 +31,21 @@ def xr_load(path, average=True, datetime64=True):
     except AttributeError:
         calendar = 'standard'
 
+    # print('\n\n\nCALENDAR: '+calendar)
+
     t0 = cf_units.num2date(d.time, d.time.units, calendar)
 
     # Convert to datetime64 for compatibility with Pandas later
     if calendar != 'standard' and datetime64:
+        # to_num = np.add(cf_units.date2num(t0, 'days since 0002-01-01 00:00:00',
+        #                 cf_units.CALENDAR_NO_LEAP), np.ones(t0.shape))
+        if calendar == 'noleap':
+            add = np.ones(t0.shape)
+        elif calendar == 'proleptic_gregorian':
+            add = np.ones(t0.shape) * 365
+
         to_num = np.add(cf_units.date2num(t0, 'days since 0002-01-01 00:00:00',
-                        cf_units.CALENDAR_NO_LEAP), np.ones(t0.shape))
+                        calendar), add)
         to_cal = [date.fromordinal(int(n)).isoformat() for n in to_num]
         t0 = np.array(to_cal, dtype='datetime64[ns]')
 
