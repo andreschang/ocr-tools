@@ -64,8 +64,7 @@ def get_stds(data, dt, combine_steps=1, **kwargs):
         ddata_array = xr.Dataset(
             {xr_vars[0]: (dims, np.take(ddata, 0, axis=0))})
         for i in range(len(xr_vars) - 1):
-            ddata_array[xr_vars[i + 1]] = xr.Dataset(
-                {xr_vars[i + 1]: (dims, np.take(ddata, i + 1, axis=0))})
+            ddata_array[xr_vars[i+1]] = np.take(ddata, i+1, axis=0)
         return(ddata_array)
 
     step_std = (data.resample(time=str(combine_steps)+fby, keep_attrs=True)
@@ -86,42 +85,19 @@ class build(object):
         """
 
         # Set parameters
+        main_vars = data1.attrs['main_vars']
+        nvars = len(main_vars)
+        by, fby = get_groupings(dt)
+        t_dim = by.split('.')[1]
+
         try:
             combine_steps = kwargs["combine_steps"]
         except KeyError:
             combine_steps = 1
         try:
-            step_std_a = kwargs["step_std_a"]
-        except KeyError:
-            step_std_a = 10.
-        try:
-            blur_std_a = kwargs["blur_std_a"]
-        except KeyError:
-            blur_std_a = 10.
-        try:
             a = kwargs["a"]
         except KeyError:
-            a = 1
-        try:
-            var_min = kwargs["var_min"]
-        except KeyError:
-            var_min = None
-        try:
-            var_max = kwargs["var_max"]
-        except KeyError:
-            var_max = None
-        try:
-            snap = kwargs["snap"]
-            if snap > 15:
-                snap = 15
-        except KeyError:
-            snap = 10.
-        try:
-            snap_atten = kwargs["snap_atten"]
-            if snap_atten > 50:
-                snap_atten = 50
-        except KeyError:
-            snap_atten = 20
+            a = 1.
         try:
             head = kwargs["head"]
         except KeyError:
@@ -135,15 +111,6 @@ class build(object):
         except KeyError:
             load_rand = None
         try:
-            hist_stretch = kwargs["hist_stretch"]
-        except KeyError:
-            hist_stretch = False
-        try:
-            c_dist = kwargs["hist_dist"]
-        except KeyError:
-            def c_dist(x):
-                return(x)
-        try:
             plot = kwargs["plot"]
         except KeyError:
             plot = False
@@ -156,10 +123,21 @@ class build(object):
         except KeyError:
             debug_step = 0
 
-        main_vars = data1.attrs['main_vars']
-        nvars = len(main_vars)
-        by, fby = get_groupings(dt)
-        t_dim = by.split('.')[1]
+        step_std_a = try_dict(kwargs, 'step_std_a', 10., main_vars)
+        blur_std_a = try_dict(kwargs, 'blur_std_a', 10., main_vars)
+        var_min = try_dict(kwargs, 'var_min', None, main_vars)
+        var_max = try_dict(kwargs, 'var_max', None, main_vars)
+        snap = try_dict(kwargs, 'snap', None, main_vars)
+        snap = {k: 15 if v > 15 else v for k, v in snap.items()}
+        snap_atten = try_dict(kwargs, 'snap_atten', 20, main_vars)
+        snap_atten = {k: 50 if v > 50 else v for k, v in snap.items()}
+        hist_stretch = try_dict(kwargs, 'hist_stretch', False, main_vars)
+
+        def none_dist(x):
+            return(x)
+
+        c_dist = try_dict(kwargs, 'hist_dist', none_dist, main_vars)
+
 
         # Make plots of data1 and data2 for comparison
         if plot:
@@ -177,9 +155,9 @@ class build(object):
                 ax0.set_title('OCR Build '+main_vars[0])
             else:
                 for vi in range(nvars):
-                    sa[main_vars[vi]].plot(ax=ax0[vi])
+                    sa[main_vars[vi]].plot(ax=ax0[vi], label='Scenario '+str(n))
                     ax0[vi].legend(loc='best')
-                    ax0[vi].title('OCR Build '+main_vars[vi])
+                    ax0[vi].set_title('OCR Build '+main_vars[vi])
 
 
         # Get annual cycle and standard dev params of data1
@@ -249,24 +227,25 @@ class build(object):
             print('New loop', opt_steps)
 
         for vi in range(nvars):
-            var_i = main_vars[vi]
+            var = main_vars[vi]
             new_var = (
-                data1[var_i].resample(time=str(combine_steps) + fby,
+                data1[var].copy(deep=True).resample(time=str(combine_steps) + fby,
                                       keep_attrs=True)
                             .mean('time')
                             .dropna('time', how='all')
                         )
 
+            print(new_var)
             ctime = new_var.coords['time'].to_index()
 
             for i in range(len(new_var['time']) - 1):
                 if dt == 'daily':
-                    t_attr = 'dayofyear'
+                    t_attr = 'day'
                 elif dt == 'monthly':
                     t_attr = 'month'
 
                 # Step is calculated based on previous plus opt_step
-                new_step = ((new_var.isel(time=i).copy(deep=True) + opt_steps[var_i].sel(
+                new_step = ((new_var.isel(time=i).copy(deep=True) + opt_steps[var].sel(
                         {t_dim: getattr(ctime[i], t_attr)}))
                                    .assign_coords(time=xr.DataArray(ctime[i+1])))
 
@@ -280,12 +259,12 @@ class build(object):
 
                 add_step_std = (step_std.sel(
                     {t_dim: [getattr(ctime[i], t_attr),
-                                  getattr(ctime[i+1], t_attr)]})
-                                        .mean(t_dim))
+                             getattr(ctime[i+1], t_attr)]})
+                                        .mean(t_dim))[var]
+
                 add_blur_std = (blur_std.sel(
                     {'time': slice(ctime[i], ctime[i+1])})
-                                        .mean('time'))
-
+                                        .mean('time'))[var]
                 # produce some randomness (or load it from previous)
                 if load_rand is not None:
                     r1, r2 = load_rand[i]
@@ -296,23 +275,25 @@ class build(object):
                         r1, r2 = self.rand[i]
                 self.rand.append((r1, r2))
 
-                new_step = (new_step + r1 * add_step_std * step_std_a/50. +
-                             r2 * add_blur_std * blur_std_a/50.)
+                new_step = (new_step + r1 * add_step_std * step_std_a[var]/50. +
+                            r2 * add_blur_std * blur_std_a[var]/50.)
 
                 if debug and i == debug_step:
                     print('[OCR debug] New_step after the addition of randomness')
                     print(new_step)
 
-                # Normalize snapping envelope to 5 standard deviations by default
-                dev_from_base = (new_step - base_ac[var_i].sel(
-                    {t_dim: getattr(ctime[i+1], t_attr)})).apply(
-                        np.abs)/(add_step_std * (15-snap))
+                # Normalize snapping envelope to 5 standard deviations default
+                dev_from_base = (np.abs(
+                    new_step - base_ac[var].sel(
+                        {t_dim: getattr(ctime[i+1], t_attr)})) /
+                    (add_step_std * (15-snap[var])))
+
                 dev_from_base = xr.where(dev_from_base > 1, 1, dev_from_base)
-                snap_amt = dev_from_base**((50 - snap_atten)/5)
+                snap_amt = dev_from_base**((50 - snap_atten[var])/5)
                 self.snap_list.append(snap_amt)
 
                 new_step = (
-                    snap_amt * self.base_data[var_i].sel({'time': ctime[i+1]}) +
+                    snap_amt * self.base_data[var].sel({'time': ctime[i+1]}) +
                     (1 - snap_amt) * new_step)
 
                 if debug and i == debug_step:
@@ -320,7 +301,7 @@ class build(object):
                     print(new_step)
 
                 # Replace variables that exceed min or max with min/max values
-                new_step = filter_minmax(new_step, var_i, var_min, var_max)
+                new_step = filter_minmax(new_step, var_min[var], var_max[var])
 
                 if debug and i == debug_step:
                     print('[OCR debug] New_step after filter_minmax')
@@ -333,42 +314,44 @@ class build(object):
                 if debug and i == debug_step:
                     print('Replaced new step looks like: ')
                     print(new_var)
+            # print(new_var)
 
             # enhance contrast
-            if hist_stretch:
+            if hist_stretch[var]:
+                if debug:
+                    print('\n[OCR debug] Starting hist_stretch')
+                # Histogram stretching only supported for spatially averaged
+                # data at the moment
                 in_mean = new_var.mean('time')
                 in_std = new_var.std('time')
                 contrast_lims = [in_mean-in_std, in_mean+in_std]
                 c_range = contrast_lims[1]-contrast_lims[0]
 
-                if var_min is not None:
-                    out_min = var_min
+                if var_min[var] is not None:
+                    out_min = var_min[var]
                 else:
-                    out_min = min0
-                if var_max is not None:
-                    out_max = var_max
+                    out_min = min0[var]
+                if var_max[var] is not None:
+                    out_max = var_max[var]
                 else:
-                    out_max = max0
+                    out_max = max0[var]
 
-                # print('\n\n\nHIST CALC')
-                hist_in = ((new_var - contrast_lims[0]) /
-                           c_range)
-                hist_var = (c_dist(
+                hist_var = (c_dist[var](
                     ((new_var - contrast_lims[0]) /
                      c_range)) * (out_max - out_min) + out_min)
 
-                new_var = xr.where(
-                    new_var > contrast_lims[0] and new_var < contrast_lims[1],
-                    hist_var, new_var)
+                cond = xr.DataArray((new_var > contrast_lims[0]) &
+                                    (new_var < contrast_lims[1]), dims=['time'])
+                new_var = xr.where(cond, hist_var, new_var)
+                # new_var = filter_minmax(new_var, var_min[var], var_max[var])
 
             if combine_steps > 1:
                 new_var = new_var.resample(time=fby).interpolate()
 
-            # new_var = new_var.to_array(name=var_i).squeeze()
-            # print(new_var)
-            
+            new_var.name = var
             out_vars.append(new_var)
 
+        # print(out_vars)
         new_ds = xr.merge(out_vars)
         new_ds.attrs = data1.attrs
         if plot:
@@ -376,35 +359,43 @@ class build(object):
         self.new = new_ds
 
 
-def filter_minmax(dataset, var_i, var_min, var_max):
+def filter_minmax(dataset, var_min, var_max):
 
     if var_min is not None:
-        if isinstance(var_min, dict):
-            try:
-                dataset = xr.where(
-                    dataset < var_min[var_i], var_min[var_i],
-                    dataset)
-            except KeyError:
-                pass
-        else:
-            dataset = xr.where(
-                dataset < var_min, var_min,
-                dataset)
+        # mina = np.ones(len(dataset['time'])) * var_min
+        dataset = xr.where(
+            dataset < var_min, var_min,
+            dataset)
 
     if var_max is not None:
-        if isinstance(var_max, dict):
-            try:
-                dataset = xr.where(
-                    dataset > var_max[var_i], var_max[var_i],
-                    dataset)
-            except KeyError:
-                pass
-        else:
-            dataset = xr.where(
-                dataset > var_max, var_max,
-                dataset)
+        # maxa = np.ones(len(dataset['time'])) * var_max
+        dataset = xr.where(
+            dataset > var_max, var_max,
+            dataset)
 
     return(dataset)
+
+
+def try_dict(kwargs, kw, except_val, main_vars):
+
+    # If kwarg given, try to use it to fill params
+    try:
+        ndict = kwargs[kw]
+        # If kwarg given, but its not a dictionary set it to the except_val
+        if not isinstance(ndict, dict):
+            except_val = ndict
+            ndict = {}
+    # Otherwise, set them all according to except_val
+    except KeyError:
+        ndict = {}
+
+    # Check to see if all vars in ndict, otherwise fill with except_val
+    for vi in main_vars:
+        try:
+            ndict[vi]
+        except KeyError:
+            ndict[vi] = except_val
+    return(ndict)
 
 
 def get_groupings(dt):
