@@ -32,12 +32,10 @@ dt = 'daily'
 ocr.build_kwargs['combine_steps'] = 5
 ocr.build_kwargs['plot'] = True
 ocr.build_kwargs['debug'] = False
-ocr.build_kwargs['debug_step'] = 2
 ocr.build_kwargs['head'] = 5
 ocr.build_kwargs['tail'] = 5
-ocr.build_kwargs['hist_stretch']['H2OSNO'] = False
-# ocr.build_kwargs['hist_args']['H2OSNO'] = {
-#     'steepness': 10, 'p': 0.06, 'knee': 0.9}
+ocr.build_kwargs['hist_args']['H2OSNO'] = {
+    'steepness': 30, 'p': 0.025, 'knee': 0.96}
 
 # File settings
 fig_dpi = 200
@@ -105,13 +103,14 @@ if 2 in steps:
             a = a_range[0]
 
         ocr.build_kwargs['a'] = a
-        ocr.build_kwargs['snap'] = 0
+        ocr.build_kwargs['step_std_a']['H2OSNO'] = 20 + 3 * ni
+        ocr.build_kwargs['blur_std_a']['H2OSNO'] = 20 + 3 * ni
 
         new = ocr.build(build_data[0], dt, build_data[1], **ocr.build_kwargs)
         # new = ocr.build(build_data[0], dt, **ocr.build_kwargs)
 
         # save figure
-        fname0['post'] = scratchId + "{:02d}".format(ni)
+        fname0['post'] = scratchId + "-" + "{:02d}".format(ni)
         fname0['ending'] = 'png'
         outf = ocr.gen_path(ocr.formatted_fname, fname0, '.', top=pdir)
         plt.savefig(outf, dpi=fig_dpi)

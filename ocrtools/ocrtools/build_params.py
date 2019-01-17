@@ -49,19 +49,20 @@ def print_dist(dist):
 
 
 # Build settings
-step_std_a = {'PRECT': 8, 'TS': 13, 'RAIN': 8, 'H2OSNO': 8}
-blur_std_a = {'PRECT': 8, 'TS': 22, 'RAIN': 8, 'H2OSNO': 8}
-snap = {'PRECT': 11.5, 'TS': 9.5, 'RAIN': 8, 'H2OSNO': 0}
-snap_atten = {'PRECT': 8, 'TS': 10, 'RAIN': 8, 'H2OSNO': 0}
-head = 3
-tail = 3
+step_std_a = {'PRECT': 10, 'TS': 13, 'RAIN': 15, 'H2OSNO': 40}
+blur_std_a = {'PRECT': 10, 'TS': 22, 'RAIN': 15, 'H2OSNO': 40}
+snap = {'PRECT': 1.2, 'TS': 1.2, 'RAIN': 0.8, 'H2OSNO': 0.4}
+snap_atten = {'PRECT': 1, 'TS': 8, 'RAIN': 1, 'H2OSNO': 0}
+head = 2
+tail = 2
 combine_plots = False
 hist_stretch = {'PRECT': True, 'TS': False, 'RAIN': True, 'H2OSNO': True}
 hist_dist = {'PRECT': p2, 'TS': False, 'RAIN': p2, 'H2OSNO': p2}
 hist_args = {'PRECT': {}, 'TS': {}, 'RAIN': {}, 'H2OSNO': {}}
 var_min = {'PRECT': 0., 'TS': None, 'RAIN': 0., 'H2OSNO': 0.}
 var_max = {'PRECT': None, 'TS': None, 'RAIN': None, 'H2OSNO': None}
-savgol_window = {'PRECT': 5, 'TS': 3, 'H2OSNO': 5, 'RAIN': 5}
+savgol_window = {'PRECT': 5, 'TS': 3, 'H2OSNO': 3, 'RAIN': 3}
+
 
 build_kwargs = {
     'step_std_a': step_std_a,
@@ -81,20 +82,34 @@ build_kwargs = {
 
 # Conversion functions
 
-def mps_2_cmpday(input_list):
+def mps_2_cmpday(data):
     t_day = 60.*60.*24.   # seconds * minutes * hours
-    lconvert = [n * t_day * 100 for n in input_list]
+    lconvert = data * t_day * 100
     return lconvert
 
 
-def K_2_F(input_list):
-    t_f = [t * 9./5 - 459.67 for t in input_list]
+def K_2_F(data):
+    t_f = data * 9./5 - 459.67
     return t_f
 
 
+def mmH2O_2_inSNO(data):
+    # http://webarchiv.ethz.ch/arolla/Arolla_Data/SnowConditions/depth_to_swe.pdf
+    # https://bit.ly/2Cpc4nR
+    H2O_row = 997  # kg/m^3
+    SNO_row = 100  # kg/m^3
+    mm_2_inch = 0.0393701
+    mmSNO = (mm_2_inch * H2O_row/SNO_row) * data
+    return(mmSNO)
+
+
+def mmps_2_cmday(data):
+    return mps_2_cmpday(data/1000.)
+
 # Conversion and plotting settings
 alabels = {'TS': 'Temperature (F)', 'PRECT': 'Precipitation (cm/day)',
-           'RAIN': 'Precipitation (cm/day)'}
-conversions = {'PRECT': mps_2_cmpday, 'TS': K_2_F, 'RAIN': mps_2_cmpday}
-ylim = {'PRECT': [0, 20], 'TS': [0, 100], 'RAIN': [0, 20]}
+           'RAIN': 'Precipitation (cm/day)', 'H2OSNO': 'Snow cover (in)'}
+conversions = {'PRECT': mps_2_cmpday, 'TS': K_2_F, 'RAIN': mmps_2_cmday,
+               'H2OSNO': mmH2O_2_inSNO}
+ylim = {'PRECT': [0, 20], 'TS': [0, 100], 'RAIN': [0, 20], 'H2O_SNO': [0, 16]}
 

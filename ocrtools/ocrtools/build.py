@@ -14,6 +14,7 @@ from scipy import signal
 from ocrtools.tk_selector import plt
 from ocrtools.explore import spatial_average
 import numpy as np
+from ocrtools.build_params import alabels, conversions, ylim
 
 
 def annual_cycle(data, dt, combine_steps=1, **kwargs):
@@ -121,7 +122,7 @@ class build(object):
         try:
             debug_step = kwargs["debug_step"]
         except KeyError:
-            debug_step = 0
+            debug_step = 2
 
         step_std_a = try_dict(kwargs, 'step_std_a', 10., main_vars)
         blur_std_a = try_dict(kwargs, 'blur_std_a', 10., main_vars)
@@ -152,14 +153,23 @@ class build(object):
             else:
                 sa = data
             if nvars == 1:
-                sa[main_vars[0]].plot(ax=ax0, label='Scenario '+str(n))
-                ax0.legend(loc='best')
+                conversions[main_vars[0]](
+                    sa[main_vars[0]]).plot(ax=ax0, label='Scenario '+str(n))
+                ax0.legend(loc='upper right')
                 # ax0.set_title('OCR Build '+main_vars[0])
+                ax0.set_title('')
+                ax0.set_ylim(ylim[main_vars[0]])
+                ax0.set_ylabel(alabels[main_vars[0]])
             else:
                 for vi in range(nvars):
-                    sa[main_vars[vi]].plot(ax=ax0[vi], label='Scenario '+str(n))
-                    ax0[vi].legend(loc='best')
+                    conversions[main_vars[vi]](
+                        sa[main_vars[vi]]).plot(
+                        ax=ax0[vi], label='Scenario '+str(n))
+                    ax0[vi].legend(loc='upper right')
                     # ax0[vi].set_title('OCR Build '+main_vars[vi])
+                    ax0[vi].set_title('')
+                    ax0[vi].set_ylim(ylim[main_vars[vi]])
+                    ax0[vi].set_ylabel(alabels[main_vars[vi]])
 
 
         def apply_savgol(dataset):
