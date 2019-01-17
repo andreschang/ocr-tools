@@ -21,16 +21,19 @@ def p1(x, **kwargs):
         return ((1/(1-x0))*(x-x0))**3
 
 
-def p2(x, knee=0.7, steepness=5, p=0.18, dice_a=1, **kwargs):
+def p2(x, knee=0.7, power=5, p=0.18, dice_a=1, **kwargs):
 
-    d_mult = dice_a/p
+    if p != 0:
+        d_mult = dice_a/p
+    else:
+        d_mult = 1
 
     try:
         roll_dice = np.random.rand(x.dims['time'])
     except TypeError:
         roll_dice = np.random.rand(len(x['time']))
 
-    x_else = ((1/(1-knee))*(x-knee))**steepness
+    x_else = ((1/(1-knee))*(x-knee))**power
     x_roll_under = roll_dice * d_mult
     x_roll_over = 0
 
@@ -40,28 +43,40 @@ def p2(x, knee=0.7, steepness=5, p=0.18, dice_a=1, **kwargs):
     return(xf)
 
 
-def print_dist(dist):
+def print_dist(dist, **kwargs):
     import matplotlib.pyplot as plt
     xa = xr.DataArray(np.arange(0, 1, 0.01), dims=['time']) 
-    x1 = dist(xa)
+    x1 = dist(xa, **kwargs)
     plt.plot(xa, x1)
     plt.savefig('test_dist.png')
 
 
 # Build settings
-step_std_a = {'PRECT': 10, 'TS': 13, 'RAIN': 15, 'H2OSNO': 40}
-blur_std_a = {'PRECT': 10, 'TS': 22, 'RAIN': 15, 'H2OSNO': 40}
-snap = {'PRECT': 1.2, 'TS': 1.2, 'RAIN': 0.8, 'H2OSNO': 0.4}
-snap_atten = {'PRECT': 1, 'TS': 8, 'RAIN': 1, 'H2OSNO': 0}
+step_std_a = {'PRECT': 10, 'TS': 13, 'RAIN': 15, 'H2OSNO': 40,
+              'FSNSCLOUD': 1.5, 'TREFHT': 10}
+blur_std_a = {'PRECT': 10, 'TS': 13, 'RAIN': 15, 'H2OSNO': 40,
+              'FSNSCLOUD': 1.5, 'TREFHT': 10}
+snap = {'PRECT': 1.2, 'TS': 1.2, 'RAIN': 0.8, 'H2OSNO': 0.4,
+        'FSNSCLOUD': 12.25, 'TREFHT': 1.2}
+snap_atten = {'PRECT': 1, 'TS': 8, 'RAIN': 1, 'H2OSNO': 0, 'FSNSCLOUD': 8,
+              'TREFHT': 8}
 head = 2
 tail = 2
 combine_plots = False
-hist_stretch = {'PRECT': True, 'TS': False, 'RAIN': True, 'H2OSNO': True}
-hist_dist = {'PRECT': p2, 'TS': False, 'RAIN': p2, 'H2OSNO': p2}
-hist_args = {'PRECT': {}, 'TS': {}, 'RAIN': {}, 'H2OSNO': {}}
-var_min = {'PRECT': 0., 'TS': None, 'RAIN': 0., 'H2OSNO': 0.}
-var_max = {'PRECT': None, 'TS': None, 'RAIN': None, 'H2OSNO': None}
-savgol_window = {'PRECT': 5, 'TS': 3, 'H2OSNO': 3, 'RAIN': 3}
+hist_stretch = {'PRECT': True, 'TS': False, 'RAIN': True, 'H2OSNO': True,
+                'FSNSCLOUD': False, 'TREFHT': False}
+hist_dist = {'PRECT': p2, 'TS': p2, 'RAIN': p2, 'H2OSNO': p2, 'FSNSCLOUD': p2,
+             'TREFHT': p2}
+hist_args = {'PRECT': {}, 'TS': {}, 'RAIN': {},
+             'H2OSNO': {
+                'power': 0.5, 'p': 0.05, 'dice_a': 0.3, 'knee': 0.85},
+             'FSNSCLOUD': {}, 'TREFHT': {}}
+var_min = {'PRECT': 0., 'TS': None, 'RAIN': 0., 'H2OSNO': 0., 'FSNSCLOUD': 0,
+           'TREFHT': None}
+var_max = {'PRECT': None, 'TS': None, 'RAIN': None, 'H2OSNO': None,
+           'FSNSCLOUD': 1, 'TREFHT': None}
+savgol_window = {'PRECT': 5, 'TS': 3, 'H2OSNO': 3, 'RAIN': 3, 'FSNSCLOUD': 9,
+                 'TREFHT': 3}
 
 
 build_kwargs = {
@@ -89,7 +104,7 @@ def mps_2_cmpday(data):
 
 
 def K_2_F(data):
-    t_f = data * 9./5 - 459.67
+    t_f = data * (9./5.) - 459.67
     return t_f
 
 
@@ -108,8 +123,10 @@ def mmps_2_cmday(data):
 
 # Conversion and plotting settings
 alabels = {'TS': 'Temperature (F)', 'PRECT': 'Precipitation (cm/day)',
-           'RAIN': 'Precipitation (cm/day)', 'H2OSNO': 'Snow cover (in)'}
+           'RAIN': 'Precipitation (cm/day)', 'H2OSNO': 'Snow cover (in)',
+           'TREFHT': 'Temperature (F)'}
 conversions = {'PRECT': mps_2_cmpday, 'TS': K_2_F, 'RAIN': mmps_2_cmday,
-               'H2OSNO': mmH2O_2_inSNO}
-ylim = {'PRECT': [0, 20], 'TS': [0, 100], 'RAIN': [0, 20], 'H2O_SNO': [0, 16]}
+               'H2OSNO': mmH2O_2_inSNO, 'TREFHT': K_2_F}
+ylim = {'PRECT': [0, 20], 'TS': [0, 100], 'RAIN': [0, 20], 'H2OSNO': [0, 10],
+        'TREFHT': [0, 100]}
 

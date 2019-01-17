@@ -13,49 +13,73 @@ import xarray as xr
 import cf_units
 import time
 from datetime import date
+import pandas as pd
 
 
-def xr_load(path, average=True, datetime64=True):
+def xr_load(path, standardize=True, **kwargs):
     """
     Loads a netCDF and fixes date convention for CESM-LE or other Gregorian
     calendar data
 
     Args:
     * path (str): path to data
+    * dt (str): daily or monthly (for standardization)
+    * average (bool): whether to align based on average of adjacent timestamps
+    (for standardization)
     """
+    if standardize:
+        try:
+            average = kwargs["average"]
+        except KeyError:
+            try:
+                if kwargs["dt"] == "daily":
+                    average = False
+                else:
+                    average = True
+            except KeyError:
+                average = False
 
-    d = xr.open_dataset(path, decode_times=False)
+        d = xr.open_dataset(path)
+        # try:
+        dt = kwargs['dt']
+        fby = 'MS' if dt == 'monthly' else 'D'
 
-    try:
-        calendar = d.time.calendar
-    except AttributeError:
-        calendar = 'standard'
+        time0 = d['time']
+        t = time0.to_index()
+        print(t)
 
-    # print('\n\n\nCALENDAR: '+calendar)
+        if average:
+            deltas = np.roll(np.diff(t), 1)
+            t = np.append((t[:-1] - deltas/2), t[-1] - deltas[0]/2)
 
-    t0 = cf_units.num2date(d.time, d.time.units, calendar)
+        print(t)
+        t = xr.DataArray(t, coords=[('time', t)])
+        yr0, yrf = np.amin(t.to_index().year), np.amax(t.to_index().year)
+        yrs = np.arange(yr0, yrf+1)
 
-    # Convert to datetime64 for compatibility with Pandas later
-    if calendar != 'standard' and datetime64:
-        # to_num = np.add(cf_units.date2num(t0, 'days since 0002-01-01 00:00:00',
-        #                 cf_units.CALENDAR_NO_LEAP), np.ones(t0.shape))
-        if calendar == 'noleap':
-            add = np.ones(t0.shape)
-        elif calendar == 'proleptic_gregorian':
-            add = np.ones(t0.shape) * 366
+        for yr in yrs:
+            ti = t.sel(time=slice(f4(yr) + '-01-01', f4(yr) + '-12-31'))
+            try:
+                td = td.append(
+                    pd.date_range(f4(yr)+'-01-01', freq=fby, periods=len(ti)))
+            except NameError:
+                td = pd.date_range(f4(yr)+'-01-01', freq=fby, periods=len(ti))
 
-        to_num = np.add(cf_units.date2num(t0, 'days since 0002-01-01 00:00:00',
-                        calendar), add)
-        to_cal = [date.fromordinal(int(n)).isoformat() for n in to_num]
-        t0 = np.array(to_cal, dtype='datetime64[ns]')
+        print(td[-370:-360])
 
-    if average:
-        deltas = np.roll(np.diff(t0), 1)
-        t_mid = np.append((t0[:-1] - deltas/2), t0[-1] - deltas[0]/2)
-        d.coords['time'] = t_mid
-    else:
-        d.coords['time'] = t0
-    print('\n[OCR] OPENED NETCDF '+path)
+        if dt == 'daily':
+            fixed = True
+            for di in range(len(td)):
+                day = td[di]
+                if day.is_leap_year:
+                    fixed = False
+                    if day.dayofyear == 59:
+                        td = td[0: di].append(td[di + 1:])
+                elif fixed is False:
+                    td = td.insert(
+                        di, pd.to_datetime(f4(day.year)+'-12-31'))
+                    fixed = True
+        d.coords['time'] = td
 
     return(d)
 
@@ -115,10 +139,7 @@ def load(data, var=[], interactive=True, drop=True, **kwargs):
 
     # Load xarray dataset
     if isinstance(data, str):
-        try:
-            ds = xr_load(data, kwargs['average'])
-        except KeyError:
-            ds = xr_load(data)
+        ds = xr_load(data, **kwargs)
     elif isinstance(data, xr.core.dataset.Dataset):
         ds = data
     else:
@@ -320,4 +341,8 @@ class scope(object):
 
         if(interactive or tk_select):
             print("\n[OCR] Finished writing new scope object")
+
+
+def f4(num): return "{:04d}".format(num)
+
 

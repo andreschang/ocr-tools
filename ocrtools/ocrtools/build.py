@@ -128,13 +128,13 @@ class build(object):
         blur_std_a = try_dict(kwargs, 'blur_std_a', 10., main_vars)
         var_min = try_dict(kwargs, 'var_min', None, main_vars)
         var_max = try_dict(kwargs, 'var_max', None, main_vars)
-        snap = try_dict(kwargs, 'snap', None, main_vars)
+        snap = try_dict(kwargs, 'snap', 1, main_vars)
         snap = {k: 15 if v > 15 else v for k, v in snap.items()}
         snap_atten = try_dict(kwargs, 'snap_atten', 20, main_vars)
         snap_atten = {k: 50 if v > 50 else v for k, v in snap.items()}
         hist_stretch = try_dict(kwargs, 'hist_stretch', False, main_vars)
         hist_args = try_dict(kwargs, 'hist_args', False, {})
-        savgol_window = try_dict(kwargs, 'savgol_window', 1, main_vars)
+        savgol_window = try_dict(kwargs, 'savgol_window', 0, main_vars)
 
         def none_dist(x):
             return(x)
@@ -153,31 +153,41 @@ class build(object):
             else:
                 sa = data
             if nvars == 1:
-                conversions[main_vars[0]](
-                    sa[main_vars[0]]).plot(ax=ax0, label='Scenario '+str(n))
+                try:
+                    conversions[main_vars[0]](
+                        sa[main_vars[0]]).plot(ax=ax0, label='Scenario '+str(n))
+                    ax0.set_ylim(ylim[main_vars[0]])
+                    ax0.set_ylabel(alabels[main_vars[0]])
+                except KeyError:
+                    sa[main_vars[0]].plot(ax=ax0, label='Scenario '+str(n))
                 ax0.legend(loc='upper right')
                 # ax0.set_title('OCR Build '+main_vars[0])
                 ax0.set_title('')
-                ax0.set_ylim(ylim[main_vars[0]])
-                ax0.set_ylabel(alabels[main_vars[0]])
             else:
                 for vi in range(nvars):
-                    conversions[main_vars[vi]](
-                        sa[main_vars[vi]]).plot(
-                        ax=ax0[vi], label='Scenario '+str(n))
+                    try:
+                        conversions[main_vars[vi]](
+                            sa[main_vars[vi]]).plot(
+                            ax=ax0[vi], label='Scenario '+str(n))
+                        ax0[vi].set_ylim(ylim[main_vars[vi]])
+                        ax0[vi].set_ylabel(alabels[main_vars[vi]])
+                    except KeyError:
+                        sa[main_vars[vi]].plot(
+                            ax=ax0[vi], label='Scenario '+str(n))
                     ax0[vi].legend(loc='upper right')
                     # ax0[vi].set_title('OCR Build '+main_vars[vi])
                     ax0[vi].set_title('')
-                    ax0[vi].set_ylim(ylim[main_vars[vi]])
-                    ax0[vi].set_ylabel(alabels[main_vars[vi]])
 
 
         def apply_savgol(dataset):
             for var in main_vars:
-                dataset[var] = xr.DataArray(signal.savgol_filter(
-                    dataset[var], savgol_window[var], 2,
-                    axis=dataset[var].get_axis_num('time')),
-                    coords=dataset[var].coords, dims=dataset[var].dims)
+                if(savgol_window[var] < 3):
+                    pass
+                else:
+                    dataset[var] = xr.DataArray(signal.savgol_filter(
+                        dataset[var], savgol_window[var], 2,
+                        axis=dataset[var].get_axis_num('time')),
+                        coords=dataset[var].coords, dims=dataset[var].dims)
             return(dataset)
 
 
@@ -189,6 +199,9 @@ class build(object):
         # (ex. january (0) or std(january, february) year 0)
         d1 = (data1.resample(time=str(combine_steps)+fby, keep_attrs=True)
                    .mean('time').dropna('time', how='all'))
+        d1['TS'].sel(time=slice('1970-01-01', '1970-12-31')).plot()
+        plt.show()
+        plt.close()
         d1 = apply_savgol(d1)
 
         d1_step_std, d1_blur_std = get_stds(data1, dt, **kwargs)
@@ -241,6 +254,12 @@ class build(object):
                 dt, **kwargs)
 
         d1_steps = d1_group.roll({t_dim: -1}, roll_coords=False) - d1_group
+        d1_group['TS'].plot()
+        plt.show()
+        plt.close()
+        d1_steps['TS'].plot()
+        plt.show()
+        aak
         full_steps = d_yrf.roll({t_dim: -1}, roll_coords=False) - d_yr0
         opt_steps = d1_steps + a * (full_steps - d1_steps)/(yrf - yr0 + 1)
 
