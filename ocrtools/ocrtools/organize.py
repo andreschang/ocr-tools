@@ -238,8 +238,11 @@ def load_cesmLE(var, dt, yr0, yrf, mem, **kwargs):
                                          .replace('_sh', ''), dt=dt) for x in f_cesm]
     t0 = '{:04d}'.format(yr0) + '-01-01'
     tf = '{:04d}'.format(yrf) + '-12-31'
-
-    return(xr.concat(load_cesm, 'time').sel(time=slice(t0, tf)))
+    print(load_cesm[0].sel(time=slice(t0, tf)))
+    if len(load_cesm) > 1:
+        return xr.concat(load_cesm, 'time').sel(time=slice(t0, tf))
+    else:
+        return load_cesm[0]
 
 
 def save_reformatted(data, dt, **kwargs):

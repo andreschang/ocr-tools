@@ -46,13 +46,11 @@ def xr_load(path, standardize=True, **kwargs):
 
         time0 = d['time']
         t = time0.to_index()
-        print(t)
 
         if average:
             deltas = np.roll(np.diff(t), 1)
             t = np.append((t[:-1] - deltas/2), t[-1] - deltas[0]/2)
 
-        print(t)
         t = xr.DataArray(t, coords=[('time', t)])
         yr0, yrf = np.amin(t.to_index().year), np.amax(t.to_index().year)
         yrs = np.arange(yr0, yrf+1)
@@ -65,20 +63,21 @@ def xr_load(path, standardize=True, **kwargs):
             except NameError:
                 td = pd.date_range(f4(yr)+'-01-01', freq=fby, periods=len(ti))
 
-        print(td[-370:-360])
-
         if dt == 'daily':
             fixed = True
             for di in range(len(td)):
                 day = td[di]
-                if day.is_leap_year:
+                if day.is_leap_year and day.dayofyear == 60:
+                    td = td[0: di].append(td[di + 1:])
+                    # print('Removed')
+                    # print(day)
                     fixed = False
-                    if day.dayofyear == 59:
-                        td = td[0: di].append(td[di + 1:])
-                elif fixed is False:
+                elif not day.is_leap_year and fixed is False:
                     td = td.insert(
-                        di, pd.to_datetime(f4(day.year)+'-12-31'))
+                        di, pd.to_datetime(f4(day.year-1)+'-12-31'))
                     fixed = True
+                    # print('Added')
+                    # print(pd.to_datetime(f4(day.year)+'-12-31'))
         d.coords['time'] = td
 
     return(d)
