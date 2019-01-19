@@ -242,7 +242,7 @@ def load_cesmLE(var, dt, yr0, yrf, mem, **kwargs):
     if len(load_cesm) > 1:
         return xr.concat(load_cesm, 'time').sel(time=slice(t0, tf))
     else:
-        return load_cesm[0]
+        return load_cesm[0].sel(time=slice(t0, tf))
 
 
 def save_reformatted(data, dt, **kwargs):
@@ -270,8 +270,12 @@ def reformatted_fname(dataset, dt, dpath=True, **kwargs):
         print('\n[OCR] Generating reformatted data filename')
 
     time_range = dataset.coords['time'].to_index()
-    yr0 = "{:04d}".format(np.amin(time_range).year)
-    yrf = "{:04d}".format(np.amax(time_range).year)
+    try:
+        yr0 = "{:04d}".format(np.amin(time_range).year)
+        yrf = "{:04d}".format(np.amax(time_range).year)
+    except TypeError:
+        yr0 = "{:04d}".format(np.amin(time_range.year))
+        yrf = "{:04d}".format(np.amax(time_range.year))
     fname_dict = {'all_vars': '_'.join(dataset.attrs['main_vars']),
                   'yr_range': yr0 + '-' + yrf, 'dt': dt, 'ending': 'nc'}
 

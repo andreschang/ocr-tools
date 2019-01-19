@@ -17,27 +17,7 @@ import numpy as np
 from ocrtools.build_params import alabels, conversions, ylim
 
 
-def annual_cycle(data, dt, combine_steps=1, **kwargs):
-    """
-    Returns average annual cycle (i.e. climatology) of input dataset
-
-    Args:
-    * data (xarray dataset or data_array)
-    * dt (str): monthly or daily
-    * combine_steps (int): how many consecutive datapoints should
-    be used for the analysis (ex. January 1-5, combine_steps = 5)
-    """
-
-    by, fby = get_groupings(dt)
-    acycle = (data.resample(time=str(combine_steps)+fby, keep_attrs=True)
-                  .mean('time')
-                  .groupby(by)
-                  .mean('time'))
-
-    return(acycle)
-
-
-def get_stds(data, dt, combine_steps=1, **kwargs):
+def get_stds(data, dt, combine_steps, **kwargs):
     """
     Returns step_std - standard dev of each equivalent div (ex. each January) -
     & blur_std - standard dev within each div
@@ -51,9 +31,23 @@ def get_stds(data, dt, combine_steps=1, **kwargs):
     """
 
     by, fby = get_groupings(dt)
-    blur_std = (data.resample(time=str(combine_steps)+fby, keep_attrs=True)
-                    .std('time')
-                    .dropna('time', how='all'))
+    t_dim = by.split('.')[1]
+    t = data.time
+    try:
+        yr0, yrf = np.amin(t.to_index().year), np.amax(t.to_index().year)
+    except TypeError:
+        yr0, yrf = np.amin(t.to_index()).year, np.amax(t.to_index()).year
+
+    d_all = []
+    for yi in np.arange(yr0, yrf+1):
+
+        d0 = data.sel(time=slice("{:04d}".format(yi) + '-01-01',
+                                 "{:04d}".format(yi) + '-12-31'))
+        d1 = (d0.resample(time=str(combine_steps) + fby, keep_attrs=True)
+                .std('time'))
+        d_all.append(d1)
+    blur_std = (xr.concat(d_all, 'time')
+        .groupby(by).mean('time').dropna(t_dim, how='all'))
 
     def step_std(dataset):
         xr_vars = [x for x in dataset.data_vars]
@@ -68,12 +62,34 @@ def get_stds(data, dt, combine_steps=1, **kwargs):
             ddata_array[xr_vars[i+1]] = np.take(ddata, i+1, axis=0)
         return(ddata_array)
 
-    step_std = (data.resample(time=str(combine_steps)+fby, keep_attrs=True)
-                    .mean('time')
-                    .groupby(by)
-                    .apply(step_std))
+    step_std = (
+        resample_each(data, combine_steps, fby).groupby(by)
+                                               .apply(step_std))
 
     return(step_std, blur_std)
+
+
+def resample_each(data, combine_steps, fby):
+
+    t = data.time
+    try:
+        yr0, yrf = np.amin(t.to_index().year), np.amax(t.to_index().year)
+    except TypeError:
+        yr0, yrf = np.amin(t.to_index()).year, np.amax(t.to_index()).year
+
+    d_all = []
+    for yi in np.arange(yr0, yrf+1):
+        if yi % 4 == 0:
+            endd = '-12-30'
+        else:
+            endd = '-12-31'
+        d0 = data.sel(time=slice("{:04d}".format(yi) + '-01-01',
+                                 "{:04d}".format(yi) + endd))
+        d1 = (d0.resample(time=str(combine_steps) + fby, keep_attrs=True)
+                .mean('time').dropna('time', how='all'))
+        d_all.append(d1)
+    d_all = xr.concat(d_all, 'time')
+    return d_all
 
 
 class build(object):
@@ -85,7 +101,7 @@ class build(object):
         sequence)
         """
 
-        # Set parameters
+        # Set parameters ======================================================
         main_vars = data1.attrs['main_vars']
         nvars = len(main_vars)
         by, fby = get_groupings(dt)
@@ -135,18 +151,19 @@ class build(object):
         hist_stretch = try_dict(kwargs, 'hist_stretch', False, main_vars)
         hist_args = try_dict(kwargs, 'hist_args', False, {})
         savgol_window = try_dict(kwargs, 'savgol_window', 0, main_vars)
+        time_range = data1.coords['time'].to_index()
+        yr0, yrf = np.amin(time_range).year, np.amax(time_range).year
 
         def none_dist(x):
             return(x)
 
         c_dist = try_dict(kwargs, 'hist_dist', none_dist, main_vars)
-
-
-        # Make plots of data1 and data2 for comparison
         if plot:
             fig0, ax0 = plt.subplots(
                 ncols=1, nrows=nvars, figsize=(8.5, 3 * nvars))
 
+        # End set parameters ==================================================
+        # Functions ===========================================================
         def plot_sa(data, n=1):
             if len([x for x in data.dims]) > 1:
                 sa = spatial_average(data, **kwargs)
@@ -178,7 +195,6 @@ class build(object):
                     # ax0[vi].set_title('OCR Build '+main_vars[vi])
                     ax0[vi].set_title('')
 
-
         def apply_savgol(dataset):
             for var in main_vars:
                 if(savgol_window[var] < 3):
@@ -190,30 +206,27 @@ class build(object):
                         coords=dataset[var].coords, dims=dataset[var].dims)
             return(dataset)
 
+        # End functions =======================================================
+        # Main script =========================================================
 
-        # Get annual cycle and standard dev params of data1
+        # Get climatology and standard dev params of data1 and
         # calculate standard devs:
         # step_std is detrended standard dev of each div
         # (ex. january or mean(january, february))
         # blur_std is standard dev of each "combine_steps" segment
         # (ex. january (0) or std(january, february) year 0)
-        d1 = (data1.resample(time=str(combine_steps)+fby, keep_attrs=True)
-                   .mean('time').dropna('time', how='all'))
-        d1['TS'].sel(time=slice('1970-01-01', '1970-12-31')).plot()
-        plt.show()
-        plt.close()
+        d1 = resample_each(data1, combine_steps, fby)
         d1 = apply_savgol(d1)
 
-        d1_step_std, d1_blur_std = get_stds(data1, dt, **kwargs)
+        d1_step_std, d1_blur_std = get_stds(data1, dt, combine_steps)
         if plot:
             plot_sa(d1, 1)
 
         # Do the same for data2 if given, otherwise refer always to data1
         if data2 is not None:
-            d2 = (data2.resample(time=str(combine_steps)+fby, keep_attrs=True)
-                       .mean('time').dropna('time', how='all'))
+            d2 = resample_each(data2, combine_steps, fby)
             d2 = apply_savgol(d2)
-            d2_step_std, d2_blur_std = get_stds(data2, dt, **kwargs)
+            d2_step_std, d2_blur_std = get_stds(data2, dt, combine_steps)
             if plot: plot_sa(d2, 2)
 
             d12 = xr.concat([d1, d2], 'scenario')
@@ -225,42 +238,29 @@ class build(object):
             self.base_data = d1
             max0, min0 = np.amax(data1), np.amin(data1)
             step_std, blur_std = d1_step_std, d1_blur_std
-        base_ac = self.base_data.groupby(by).mean('time')
-        d1_group = d1.groupby(by).mean('time')
 
-        # Calculate full range of input data
-        d_range = max0 - min0
+        base_ac = (resample_each(self.base_data, combine_steps, fby)
+                   .groupby(by).mean('time'))
+        d1_ac = d1.groupby(by).mean('time')
 
         # opt_step is the variable delta between timesteps based on 1) standard
         # annual cycle of data1 and 2) affect of scenario choice on overall
         # variable between data1 and data12
-
-        time_range = data1.coords['time'].to_index()
-        yr0, yrf = np.amin(time_range).year, np.amax(time_range).year
-        d_yr0 = annual_cycle(
-            data1.sel(time=slice("{:04d}".format(yr0) + '-01-01',
-                                 "{:04d}".format(yr0 + head-1) + '-12-31')),
-            dt, **kwargs)
+        d1_yr0 = (d1.sel(time=slice("{:04d}".format(yr0) + '-01-01',
+                         "{:04d}".format(yr0 + head-1) + '-12-31'))
+                    .groupby(by).mean('time'))
 
         if data2 is not None:
-            d_yrf = annual_cycle(
-                data2.sel(time=slice("{:04d}".format(yrf - tail+1) + '-01-01',
-                                     "{:04d}".format(yrf) + '-12-31')),
-                dt, **kwargs)
+            d_yrf = (d2.sel(time=slice("{:04d}".format(yrf-tail+1) + '-01-01',
+                            "{:04d}".format(yrf) + '-12-31'))
+                       .groupby(by).mean('time'))
         else:
-            d_yrf = annual_cycle(
-                data1.sel(time=slice("{:04d}".format(yrf - tail+1) + '-01-01',
-                                     "{:04d}".format(yrf) + '-12-31')),
-                dt, **kwargs)
+            d_yrf = (d1.sel(time=slice("{:04d}".format(yrf-tail+1) + '-01-01',
+                            "{:04d}".format(yrf) + '-12-31'))
+                       .groupby(by).mean('time'))
 
-        d1_steps = d1_group.roll({t_dim: -1}, roll_coords=False) - d1_group
-        d1_group['TS'].plot()
-        plt.show()
-        plt.close()
-        d1_steps['TS'].plot()
-        plt.show()
-        aak
-        full_steps = d_yrf.roll({t_dim: -1}, roll_coords=False) - d_yr0
+        d1_steps = d1_ac.roll({t_dim: -1}, roll_coords=False) - d1_ac
+        full_steps = d_yrf.roll({t_dim: -1}, roll_coords=False) - d1_yr0
         opt_steps = d1_steps + a * (full_steps - d1_steps)/(yrf - yr0 + 1)
 
         self.rand = []
@@ -272,24 +272,17 @@ class build(object):
 
         for vi in range(nvars):
             var = main_vars[vi]
-            new_var = (
-                data1[var].copy(deep=True).resample(time=str(combine_steps) + fby,
-                                      keep_attrs=True)
-                            .mean('time')
-                            .dropna('time', how='all'))
 
+            new_var = d1[var]
             ctime = new_var.coords['time'].to_index()
+            new_var = xr.where(new_var.time == ctime[0],
+                               d1_yr0.isel({t_dim: 0})[var], new_var)
 
             for i in range(len(new_var['time']) - 1):
-                if dt == 'daily':
-                    t_attr = 'dayofyear'
-                elif dt == 'monthly':
-                    t_attr = 'month'
-
                 # Step is calculated based on previous plus opt_step
 
-                new_step = ((new_var.isel(time=i).copy(deep=True) + opt_steps[var].sel(
-                        {t_dim: getattr(ctime[i], t_attr)}, method='nearest'))
+                new_step = ((new_var.isel(time=i).copy() + opt_steps[var].sel(
+                        {t_dim: getattr(ctime[i], t_dim)}, method='nearest'))
                                    .assign_coords(time=xr.DataArray(ctime[i+1])))
 
                 if debug and i == debug_step:
@@ -301,19 +294,21 @@ class build(object):
                     print((new_var.isel(time=i).copy(deep=True)))
                     print('and')
                     print(opt_steps[var].sel(
-                        {t_dim: getattr(ctime[i], t_attr)}, method='nearest'))
+                        {t_dim: getattr(ctime[i], t_dim)}, method='nearest'))
 
                 # Some standard deviation added based on average of std for
                 # step i and step i+1
 
                 add_step_std = (step_std.sel(
-                    {t_dim: [getattr(ctime[i], t_attr),
-                             getattr(ctime[i+1], t_attr)]})
+                    {t_dim: [getattr(ctime[i], t_dim),
+                             getattr(ctime[i+1], t_dim)]})
                                         .mean(t_dim))[var]
 
                 add_blur_std = (blur_std.sel(
-                    {'time': slice(ctime[i], ctime[i+1])})
-                                        .mean('time'))[var]
+                    {t_dim: [getattr(ctime[i], t_dim),
+                             getattr(ctime[i+1], t_dim)]})
+                                        .mean(t_dim))[var]
+
                 # produce some randomness (or load it from previous)
                 if load_rand is not None:
                     r1, r2 = load_rand[i]
@@ -338,7 +333,7 @@ class build(object):
                 else:
                     dev_from_base = (np.abs(
                         new_step - base_ac[var].sel(
-                            {t_dim: getattr(ctime[i+1], t_attr)})) /
+                            {t_dim: getattr(ctime[i+1], t_dim)})) /
                         (add_step_std * (15-snap[var])))
 
                     dev_from_base = xr.where(dev_from_base > 1, 1, dev_from_base)
@@ -407,7 +402,10 @@ class build(object):
                 new_var = new_var.resample(time=fby).interpolate()
 
             new_var.name = var
-            out_vars.append(new_var)
+            try:
+                out_vars.append(new_var.drop(t_dim))
+            except KeyError:
+                out_vars.append(new_var)
 
         # print(out_vars)
         new_ds = xr.merge(out_vars)
@@ -434,7 +432,7 @@ def filter_minmax(dataset, var_min, var_max):
     return(dataset)
 
 
-def try_dict(kwargs, kw, except_val, main_vars):
+def try_dict(kwargs, kw, except_val, main_vars, vector=False):
 
     # If kwarg given, try to use it to fill params
     try:
@@ -453,6 +451,7 @@ def try_dict(kwargs, kw, except_val, main_vars):
             ndict[vi]
         except KeyError:
             ndict[vi] = except_val
+
     return(ndict)
 
 

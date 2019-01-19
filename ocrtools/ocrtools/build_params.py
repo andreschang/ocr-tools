@@ -44,7 +44,6 @@ def p2(x, knee=0.7, power=5, p=0.18, dice_a=1, **kwargs):
 
 
 def print_dist(dist, **kwargs):
-    import matplotlib.pyplot as plt
     xa = xr.DataArray(np.arange(0, 1, 0.01), dims=['time']) 
     x1 = dist(xa, **kwargs)
     plt.plot(xa, x1)
@@ -52,31 +51,31 @@ def print_dist(dist, **kwargs):
 
 
 # Build settings
-step_std_a = {'PRECT': 10, 'TS': 13, 'RAIN': 15, 'H2OSNO': 40,
-              'FSNSCLOUD': 1.5, 'TREFHT': 10}
-blur_std_a = {'PRECT': 10, 'TS': 13, 'RAIN': 15, 'H2OSNO': 40,
-              'FSNSCLOUD': 1.5, 'TREFHT': 10}
-snap = {'PRECT': 1.2, 'TS': 1.2, 'RAIN': 0.8, 'H2OSNO': 0.4,
-        'FSNSCLOUD': 12.25, 'TREFHT': 1.2}
+step_std_a = {'PRECT': 10, 'TS': 13.5, 'RAIN': 15, 'H2OSNO': 40,
+              'FSNSCLOUD': 5, 'TREFHT': 13.5, 'RELHUM': 5}
+blur_std_a = {'PRECT': 10, 'TS': 13.5, 'RAIN': 15, 'H2OSNO': 40,
+              'FSNSCLOUD': 5, 'TREFHT': 11.5, 'RELHUM': 5}
+snap = {'PRECT': 1.2, 'TS': 0.8, 'RAIN': 0.8, 'H2OSNO': 0.25,
+        'FSNSCLOUD': 6., 'TREFHT': 0.8, 'RELHUM': 6.}
 snap_atten = {'PRECT': 1, 'TS': 8, 'RAIN': 1, 'H2OSNO': 0, 'FSNSCLOUD': 8,
-              'TREFHT': 8}
+              'TREFHT': 10., 'RELHUM': 1.}
 head = 2
 tail = 2
 combine_plots = False
 hist_stretch = {'PRECT': True, 'TS': False, 'RAIN': True, 'H2OSNO': True,
-                'FSNSCLOUD': False, 'TREFHT': False}
+                'FSNSCLOUD': False, 'TREFHT': False, 'RELHUM': False}
 hist_dist = {'PRECT': p2, 'TS': p2, 'RAIN': p2, 'H2OSNO': p2, 'FSNSCLOUD': p2,
-             'TREFHT': p2}
+             'TREFHT': p2, 'RELHUM': p2}
 hist_args = {'PRECT': {}, 'TS': {}, 'RAIN': {},
              'H2OSNO': {
-                'power': 0.5, 'p': 0.05, 'dice_a': 0.3, 'knee': 0.85},
-             'FSNSCLOUD': {}, 'TREFHT': {}}
+                'power': 0.5, 'p': 0, 'dice_a': 0.3, 'knee': 0.9},
+             'FSNSCLOUD': {}, 'TREFHT': {}, 'RELHUM': {}}
 var_min = {'PRECT': 0., 'TS': None, 'RAIN': 0., 'H2OSNO': 0., 'FSNSCLOUD': 0,
-           'TREFHT': None}
+           'TREFHT': None, 'RELHUM': 0.}
 var_max = {'PRECT': None, 'TS': None, 'RAIN': None, 'H2OSNO': None,
-           'FSNSCLOUD': 1, 'TREFHT': None}
-savgol_window = {'PRECT': 5, 'TS': 3, 'H2OSNO': 3, 'RAIN': 3, 'FSNSCLOUD': 9,
-                 'TREFHT': 3}
+           'FSNSCLOUD': 1., 'TREFHT': None, 'RELHUM': 1.}
+savgol_window = {'PRECT': 5, 'TS': 3, 'H2OSNO': 0, 'RAIN': 3, 'FSNSCLOUD': 9,
+                 'TREFHT': 3, 'RELHUM': 9}
 
 
 build_kwargs = {
@@ -121,12 +120,21 @@ def mmH2O_2_inSNO(data):
 def mmps_2_cmday(data):
     return mps_2_cmpday(data/1000.)
 
+
+def percentify(data): return 100 * data
+
+
+def inverse(data): return 100 * (1-data)
+
+
 # Conversion and plotting settings
 alabels = {'TS': 'Temperature (F)', 'PRECT': 'Precipitation (cm/day)',
            'RAIN': 'Precipitation (cm/day)', 'H2OSNO': 'Snow cover (in)',
-           'TREFHT': 'Temperature (F)'}
+           'TREFHT': 'Temperature (F)', 'RELHUM': 'Relative humidity (%)',
+           'FSNSCLOUD': "Cloudiness (% SW energy blocked)"}
 conversions = {'PRECT': mps_2_cmpday, 'TS': K_2_F, 'RAIN': mmps_2_cmday,
-               'H2OSNO': mmH2O_2_inSNO, 'TREFHT': K_2_F}
+               'H2OSNO': mmH2O_2_inSNO, 'TREFHT': K_2_F, 'RELHUM': percentify,
+                'FSNSCLOUD': inverse}
 ylim = {'PRECT': [0, 20], 'TS': [0, 100], 'RAIN': [0, 20], 'H2OSNO': [0, 10],
-        'TREFHT': [0, 100]}
+        'TREFHT': [0, 100], 'FSNSCLOUD': [0, 100], 'RELHUM': [0, 100]}
 

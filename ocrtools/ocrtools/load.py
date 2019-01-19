@@ -16,7 +16,7 @@ from datetime import date
 import pandas as pd
 
 
-def xr_load(path, standardize=True, **kwargs):
+def xr_load(path, average=False, standardize=True, **kwargs):
     """
     Loads a netCDF and fixes date convention for CESM-LE or other Gregorian
     calendar data
@@ -27,45 +27,57 @@ def xr_load(path, standardize=True, **kwargs):
     * average (bool): whether to align based on average of adjacent timestamps
     (for standardization)
     """
-    if standardize:
-        try:
-            average = kwargs["average"]
-        except KeyError:
-            try:
-                if kwargs["dt"] == "daily":
-                    average = False
-                else:
-                    average = True
-            except KeyError:
-                average = False
+    d = xr.open_dataset(path)
 
-        d = xr.open_dataset(path)
-        # try:
-        dt = kwargs['dt']
-        fby = 'MS' if dt == 'monthly' else 'D'
-
-        time0 = d['time']
-        t = time0.to_index()
-
+    try:
+        average = kwargs["average"]
         if average:
-            deltas = np.roll(np.diff(t), 1)
-            t = np.append((t[:-1] - deltas/2), t[-1] - deltas[0]/2)
+            dt = kwargs['dt']
+            fby = 'MS' if dt == 'monthly' else 'D'
+            t = d['time'].to_index()
 
-        t = xr.DataArray(t, coords=[('time', t)])
+            if average:
+                deltas = np.roll(np.diff(t), 1)
+                td = np.append((t[:-1] - deltas/2), t[-1] - deltas[0]/2)
+
+            d.coords['time'] = td
+    except KeyError:
+        pass
+
+    if standardize:
+        d = noleap_2_datetime(d, **kwargs)
+
+    return(d)
+
+
+def noleap_2_datetime(data, dt, **kwargs):
+
+    by, fby = get_groupings(dt)
+    t = data['time']
+    # t = time0.to_index()
+
+    try:
         yr0, yrf = np.amin(t.to_index().year), np.amax(t.to_index().year)
-        yrs = np.arange(yr0, yrf+1)
+    except TypeError:
+        yr0, yrf = np.amin(t.to_index()).year, np.amax(t.to_index()).year
+    yrs = np.arange(yr0, yrf+1)
 
-        for yr in yrs:
-            ti = t.sel(time=slice(f4(yr) + '-01-01', f4(yr) + '-12-31'))
-            try:
-                td = td.append(
-                    pd.date_range(f4(yr)+'-01-01', freq=fby, periods=len(ti)))
-            except NameError:
-                td = pd.date_range(f4(yr)+'-01-01', freq=fby, periods=len(ti))
+    for yr in yrs:
+        ti = t.sel(time=slice(f4(yr) + '-01-01', f4(yr) + '-12-31'))
+        try:
+            td = td.append(
+                pd.date_range(f4(yr)+'-01-01', freq=fby, periods=len(ti)))
+        except NameError:
+            td = pd.date_range(f4(yr)+'-01-01', freq=fby, periods=len(ti))
 
-        if dt == 'daily':
-            fixed = True
-            for di in range(len(td)):
+        fixed = True
+
+    if dt == 'daily':
+        for di in range(len(td)):
+            if td[di-1].is_leap_year and di == len(td):
+                td = td.insert(
+                        di, pd.to_datetime(f4(yrf)+'-12-31'))
+            else:
                 day = td[di]
                 if day.is_leap_year and day.dayofyear == 60:
                     td = td[0: di].append(td[di + 1:])
@@ -78,9 +90,9 @@ def xr_load(path, standardize=True, **kwargs):
                     fixed = True
                     # print('Added')
                     # print(pd.to_datetime(f4(day.year)+'-12-31'))
-        d.coords['time'] = td
 
-    return(d)
+    data.coords['time'] = td
+    return(data)
 
 
 def standardize_coords(dataset, center=True):
@@ -344,4 +356,13 @@ class scope(object):
 
 def f4(num): return "{:04d}".format(num)
 
+
+def get_groupings(dt):
+    if dt == 'monthly':
+        by = 'time.month'
+        fby = 'MS'
+    elif dt == 'daily':
+        by = 'time.date'
+        fby = 'D'
+    return(by, fby)
 
