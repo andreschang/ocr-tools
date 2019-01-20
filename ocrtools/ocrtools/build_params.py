@@ -52,13 +52,13 @@ def print_dist(dist, **kwargs):
 
 # Build settings
 step_std_a = {'PRECT': 10, 'TS': 13.5, 'RAIN': 15, 'H2OSNO': 40,
-              'FSNSCLOUD': 5, 'TREFHT': 13.5, 'RELHUM': 5}
+              'FSNSCLOUD': 8, 'TREFHT': 13.5, 'RELHUM': 8}
 blur_std_a = {'PRECT': 10, 'TS': 13.5, 'RAIN': 15, 'H2OSNO': 40,
-              'FSNSCLOUD': 5, 'TREFHT': 11.5, 'RELHUM': 5}
+              'FSNSCLOUD': 8, 'TREFHT': 11.5, 'RELHUM': 8}
 snap = {'PRECT': 1.2, 'TS': 0.8, 'RAIN': 0.8, 'H2OSNO': 0.25,
-        'FSNSCLOUD': 6., 'TREFHT': 0.8, 'RELHUM': 6.}
-snap_atten = {'PRECT': 1, 'TS': 8, 'RAIN': 1, 'H2OSNO': 0, 'FSNSCLOUD': 8,
-              'TREFHT': 10., 'RELHUM': 1.}
+        'FSNSCLOUD': 1., 'TREFHT': 0.8, 'RELHUM': 1}
+snap_atten = {'PRECT': 1, 'TS': 8, 'RAIN': 1, 'H2OSNO': 0, 'FSNSCLOUD': 6,
+              'TREFHT': 10., 'RELHUM': 6.}
 head = 2
 tail = 2
 combine_plots = False
@@ -74,8 +74,8 @@ var_min = {'PRECT': 0., 'TS': None, 'RAIN': 0., 'H2OSNO': 0., 'FSNSCLOUD': 0,
            'TREFHT': None, 'RELHUM': 0.}
 var_max = {'PRECT': None, 'TS': None, 'RAIN': None, 'H2OSNO': None,
            'FSNSCLOUD': 1., 'TREFHT': None, 'RELHUM': 1.}
-savgol_window = {'PRECT': 5, 'TS': 3, 'H2OSNO': 0, 'RAIN': 3, 'FSNSCLOUD': 9,
-                 'TREFHT': 3, 'RELHUM': 9}
+savgol_window = {'PRECT': 5, 'TS': 3, 'H2OSNO': 0, 'RAIN': 3, 'FSNSCLOUD': 5,
+                 'TREFHT': 3, 'RELHUM': 5}
 
 
 build_kwargs = {
@@ -136,5 +136,5 @@ conversions = {'PRECT': mps_2_cmpday, 'TS': K_2_F, 'RAIN': mmps_2_cmday,
                'H2OSNO': mmH2O_2_inSNO, 'TREFHT': K_2_F, 'RELHUM': percentify,
                 'FSNSCLOUD': inverse}
 ylim = {'PRECT': [0, 20], 'TS': [0, 100], 'RAIN': [0, 20], 'H2OSNO': [0, 10],
-        'TREFHT': [0, 100], 'FSNSCLOUD': [0, 100], 'RELHUM': [0, 100]}
+        'TREFHT': [0, 100], 'FSNSCLOUD': [0, 80], 'RELHUM': [60, 100]}
 

@@ -261,8 +261,11 @@ def subset(dataset, scope):
 
         except AttributeError:
             # Subset based on coordinat min/max
-            d_subset = box_subset(d_subset, scope.lat_min, scope.lat_max,
-                                  scope.lon_min, scope.lon_max)
+            try:
+                d_subset = box_subset(d_subset, scope.lat_min, scope.lat_max,
+                                      scope.lon_min, scope.lon_max)
+            except AttributeError:
+                pass
 
     if 'z_max' in scope_keys:
         d_subset = d_subset.where(d_subset.z <= scope.z_max, drop=True)
