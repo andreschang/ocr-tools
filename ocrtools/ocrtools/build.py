@@ -17,187 +17,32 @@ import numpy as np
 from ocrtools.build_params import alabels, conversions, ylim
 
 
-def get_stds(data, dt, combine_steps, **kwargs):
-    """
-    Returns step_std - standard dev of each equivalent div (ex. each January) -
-    & blur_std - standard dev within each div
-    (only non-zero if combine_steps > 0)
-
-    Args:
-    * data (xarray dataset or data_array)
-    * dt (str): monthly or daily
-    * combine_steps (int): how many consecutive datapoints should
-    be used for the analysis (ex. January 1-5, combine_steps = 5)
-    """
-
-    by, fby = get_groupings(dt)
-    t_dim = by.split('.')[1]
-    t = data.time
-    try:
-        yr0, yrf = np.amin(t.to_index().year), np.amax(t.to_index().year)
-    except TypeError:
-        yr0, yrf = np.amin(t.to_index()).year, np.amax(t.to_index()).year
-
-    d_all = []
-    for yi in np.arange(yr0, yrf+1):
-
-        d0 = data.sel(time=slice("{:04d}".format(yi) + '-01-01',
-                                 "{:04d}".format(yi) + '-12-31'))
-        d1 = (d0.resample(time=str(combine_steps) + fby, keep_attrs=True)
-                .std('time'))
-        d_all.append(d1)
-    blur_std = (xr.concat(d_all, 'time')
-        .groupby(by).mean('time').dropna(t_dim, how='all'))
-
-    def step_std(dataset):
-        xr_vars = [x for x in dataset.data_vars]
-
-        da = dataset.to_array().dropna('time', how='all')
-        t_axis = da.get_axis_num('time')
-        ddata = np.std(signal.detrend(da, axis=t_axis), axis=t_axis)
-        dims = [x for x in dataset.dims if x != 'time']
-        ddata_array = xr.Dataset(
-            {xr_vars[0]: (dims, np.take(ddata, 0, axis=0))})
-        for i in range(len(xr_vars) - 1):
-            ddata_array[xr_vars[i+1]] = np.take(ddata, i+1, axis=0)
-        return(ddata_array)
-
-    step_std = (
-        resample_each(data, combine_steps, fby).groupby(by)
-                                               .apply(step_std))
-
-    return(step_std, blur_std)
-
-
-def resample_each(data, combine_steps, fby):
-
-    t = data.time
-    try:
-        yr0, yrf = np.amin(t.to_index().year), np.amax(t.to_index().year)
-    except TypeError:
-        yr0, yrf = np.amin(t.to_index()).year, np.amax(t.to_index()).year
-
-    d_all = []
-    for yi in np.arange(yr0, yrf+1):
-        if yi % 4 == 0:
-            endd = '-12-30'
-        else:
-            endd = '-12-31'
-        d0 = data.sel(time=slice("{:04d}".format(yi) + '-01-01',
-                                 "{:04d}".format(yi) + endd))
-        d1 = (d0.resample(time=str(combine_steps) + fby, keep_attrs=True)
-                .mean('time').dropna('time', how='all'))
-        d_all.append(d1)
-    d_all = xr.concat(d_all, 'time')
-    return d_all
-
-
 class build(object):
 
-    def __init__(self, data1, dt, data2=None, **kwargs):
+    def __init__(self, data1, var_lims, data2=None, combine_steps=1,
+                 head=1, tail=1, savgol_window=0):
         """
         Makes new climate data based on existing modeled data and user options
         using a step-wise approach (i.e. OCR Tools calculates each timestep in
         sequence)
         """
 
-        # Set parameters ======================================================
-        main_vars = data1.attrs['main_vars']
-        nvars = len(main_vars)
-        by, fby = get_groupings(dt)
-        t_dim = by.split('.')[1]
-
-        try:
-            combine_steps = kwargs["combine_steps"]
-        except KeyError:
-            combine_steps = 1
-        try:
-            a = kwargs["a"]
-        except KeyError:
-            a = 1.
-        try:
-            head = kwargs["head"]
-        except KeyError:
-            head = 1
-        try:
-            tail = kwargs["tail"]
-        except KeyError:
-            tail = 1
-        try:
-            load_rand = kwargs["load_rand"]
-        except KeyError:
-            load_rand = None
-        try:
-            plot = kwargs["plot"]
-        except KeyError:
-            plot = False
-        try:
-            debug = kwargs["debug"]
-        except KeyError:
-            debug = False
-        try:
-            debug_step = kwargs["debug_step"]
-        except KeyError:
-            debug_step = 2
-
-        step_std_a = try_dict(kwargs, 'step_std_a', 10., main_vars)
-        blur_std_a = try_dict(kwargs, 'blur_std_a', 10., main_vars)
-        var_min = try_dict(kwargs, 'var_min', None, main_vars)
-        var_max = try_dict(kwargs, 'var_max', None, main_vars)
-        snap = try_dict(kwargs, 'snap', 1, main_vars)
-        snap = {k: 15 if v > 15 else v for k, v in snap.items()}
-        snap_atten = try_dict(kwargs, 'snap_atten', 20, main_vars)
-        snap_atten = {k: 50 if v > 50 else v for k, v in snap.items()}
-        hist_stretch = try_dict(kwargs, 'hist_stretch', False, main_vars)
-        hist_args = try_dict(kwargs, 'hist_args', False, {})
-        savgol_window = try_dict(kwargs, 'savgol_window', 0, main_vars)
-        time_range = data1.coords['time'].to_index()
-        yr0, yrf = np.amin(time_range).year, np.amax(time_range).year
-
-        def none_dist(x):
-            return(x)
-
-        c_dist = try_dict(kwargs, 'hist_dist', none_dist, main_vars)
-        if plot:
-            fig0, ax0 = plt.subplots(
-                ncols=1, nrows=nvars, figsize=(8.5, 3 * nvars))
-
-        # End set parameters ==================================================
-        # Functions ===========================================================
-        def plot_sa(data, n=1):
-            if len([x for x in data.dims]) > 1:
-                sa = spatial_average(data, **kwargs)
-            else:
-                sa = data
-            if nvars == 1:
-                try:
-                    conversions[main_vars[0]](
-                        sa[main_vars[0]]).plot(ax=ax0, label='Scenario '+str(n))
-                    ax0.set_ylim(ylim[main_vars[0]])
-                    ax0.set_ylabel(alabels[main_vars[0]])
-                except KeyError:
-                    sa[main_vars[0]].plot(ax=ax0, label='Scenario '+str(n))
-                ax0.legend(loc='upper right')
-                # ax0.set_title('OCR Build '+main_vars[0])
-                ax0.set_title('')
-            else:
-                for vi in range(nvars):
-                    try:
-                        conversions[main_vars[vi]](
-                            sa[main_vars[vi]]).plot(
-                            ax=ax0[vi], label='Scenario '+str(n))
-                        ax0[vi].set_ylim(ylim[main_vars[vi]])
-                        ax0[vi].set_ylabel(alabels[main_vars[vi]])
-                    except KeyError:
-                        sa[main_vars[vi]].plot(
-                            ax=ax0[vi], label='Scenario '+str(n))
-                    ax0[vi].legend(loc='upper right')
-                    # ax0[vi].set_title('OCR Build '+main_vars[vi])
-                    ax0[vi].set_title('')
+        def resample_each(data, combine_steps):
+            if self.dt == 'monthly':
+                return (
+                    data.resample(time=str(combine_steps) + self.fby, keep_attrs=True)
+                        .mean('time'))
+            elif self.dt == 'daily':
+                grouped_data = data.groupby('time.year')
+                return xr.concat(
+                    [n.resample(time=str(combine_steps) + self.fby)
+                      .mean('time')
+                      .isel(time=slice(0, int(365/combine_steps)))
+                     for m, n in grouped_data], 'time')
 
         def apply_savgol(dataset):
-            for var in main_vars:
-                if(savgol_window[var] < 3):
+            for var in self.vars:
+                if(savgol_window < 3):
                     pass
                 else:
                     dataset[var] = xr.DataArray(signal.savgol_filter(
@@ -206,253 +51,163 @@ class build(object):
                         coords=dataset[var].coords, dims=dataset[var].dims)
             return(dataset)
 
-        # End functions =======================================================
-        # Main script =========================================================
+        # Set parameters ======================================================
+        self.vars = list(data1.data_vars)
+        dt0 = int(data1.time[1]-data1.time[0])
+        self.dt = 'daily' if dt0 < 2.3e15 else 'monthly'
+        self.nvars = len(self.vars)
+        self.by, self.fby = get_groupings(self.dt)
+        self.t_dim = self.by.split('.')[1]
+        self.yr0 = np.amin(data1.time.to_index()).year
+        self.yrf = np.amax(data1.time.to_index()).year
+        self.var_lims = xr.Dataset(
+            {k: ('bound', var_lims[k]) for k in self.vars},
+            coords={'bound': ['min', 'max']})
 
-        # Get climatology and standard dev params of data1 and
-        # calculate standard devs:
-        # step_std is detrended standard dev of each div
-        # (ex. january or mean(january, february))
-        # blur_std is standard dev of each "combine_steps" segment
-        # (ex. january (0) or std(january, february) year 0)
-        d1 = resample_each(data1, combine_steps, fby)
-        d1 = apply_savgol(d1)
-
-        d1_step_std, d1_blur_std = get_stds(data1, dt, combine_steps)
-        if plot:
-            plot_sa(d1, 1)
+        self.v1 = resample_each(data1, combine_steps)
+        self.v1 = apply_savgol(self.v1)
+        s1 = self.v1.roll({'time': -1}, roll_coords=False) - self.v1
+        self.V1 = self.v1.groupby(self.by).mean('time')
+        self.S1 = s1.groupby(self.by).mean('time')
+        self.DV1 = self.v1.groupby(self.by).std('time')
+        self.DS1 = s1.groupby(self.by).std('time')
+        self.max0, self.min0 = np.amax(self.v1), np.amin(self.v1)
 
         # Do the same for data2 if given, otherwise refer always to data1
         if data2 is not None:
-            d2 = resample_each(data2, combine_steps, fby)
-            d2 = apply_savgol(d2)
-            d2_step_std, d2_blur_std = get_stds(data2, dt, combine_steps)
-            if plot: plot_sa(d2, 2)
+            self.v2 = resample_each(data2, combine_steps)
+            self.v2 = apply_savgol(self.v2)
+            s2 = self.v2.roll({'time': -1}, roll_coords=False) - self.v2
+            self.V2 = self.v2.groupby(self.by).mean('time')
+            # self.S2 = s2.groupby(self.by).mean('time')
+            self.DV2 = self.v2.groupby(self.by).std('time')
+            self.DS2 = s2.groupby(self.by).std('time')
 
-            d12 = xr.concat([d1, d2], 'scenario')
-            max0, min0 = np.amax(d12), np.amin(d12)
-            step_std = (d1_step_std + d2_step_std)/2
-            blur_std = (d1_blur_std + d2_blur_std)/2
-            self.base_data = d12.mean('scenario')
+            self.max0 = np.amax(self.v2) if np.amax(self.v2) > self.max0 else self.max0
+            self.min0 = np.amin(self.v2) if np.amin(self.v2) < self.min0 else self.min0
+            v2_tail = (self.v2.sel(
+                time=slice("{:04d}".format(self.yrf - tail + 1) + '-01-01',
+                           "{:04d}".format(self.yrf) + '-12-31'))
+                       .groupby(self.by).mean('time'))
+            v1_head = (self.v2.sel(
+                time=slice("{:04d}".format(self.yr0) + '-01-01',
+                           "{:04d}".format(self.yr0 + head - 1) + '-12-31'))
+                       .groupby(self.by).mean('time'))
+            self.F = v2_tail.roll({self.t_dim: -1}, roll_coords=False) - v1_head
+
         else:
-            self.base_data = d1
-            max0, min0 = np.amax(data1), np.amin(data1)
-            step_std, blur_std = d1_step_std, d1_blur_std
+            self.V2, self.S2 = None, None
+            self.DV2, self.DS2 = None, None
+            self.F = None
 
-        base_ac = (resample_each(self.base_data, combine_steps, fby)
-                   .groupby(by).mean('time'))
-        d1_ac = d1.groupby(by).mean('time')
+    def mix(self, a):
 
-        # opt_step is the variable delta between timesteps based on 1) standard
-        # annual cycle of data1 and 2) affect of scenario choice on overall
-        # variable between data1 and data12
-        d1_yr0 = (d1.sel(time=slice("{:04d}".format(yr0) + '-01-01',
-                         "{:04d}".format(yr0 + head-1) + '-12-31'))
-                    .groupby(by).mean('time'))
+        def scenario_merge(data1, data2):
+            if data2 is None:
+                return data1
+            else:
+                return (1 - a) * data1 + a * data2
 
-        if data2 is not None:
-            d_yrf = (d2.sel(time=slice("{:04d}".format(yrf-tail+1) + '-01-01',
-                            "{:04d}".format(yrf) + '-12-31'))
-                       .groupby(by).mean('time'))
+        self.V = scenario_merge(self.V1, self.V2)
+        self.OS = scenario_merge(self.S1, self.F)
+        self.DV = scenario_merge(self.DV1, self.DV2)
+        self.DS = scenario_merge(self.DS1, self.DS2)
+
+    def regression(self, y_var, x_vars):
+        from sklearn.linear_model import LinearRegression
+        from sklearn.pipeline import make_pipeline, make_union
+        from sklearn_xarray import Stacker, Select
+        from scipy.stats import pearsonr
+
+        vn = [self.v1]
+        if self.V2 is not None:
+            vn.append(self.v1)
+
+        all_c, all_int, all_corr = [], [], []
+        for vi in vn:
+            x = vi[x_vars]
+            y = vi[y_var]
+
+            x_in = make_union(
+                    *[make_pipeline(Select(xi), Stacker())
+                      for xi in x_vars])
+            mod = make_pipeline(x_in, LinearRegression())
+            y_np = Stacker().fit_transform(y)
+            mod.fit(x, y_np)
+            lm = mod.named_steps['linearregression']
+            coefs = list(lm.coef_.flat)
+            intercept = lm.intercept_[0]
+            y_pred = intercept + sum(
+                [x[x_vars[i]] * coefs[i] for i in range(len(x_vars))])
+            corr = pearsonr(y.values.ravel(), y_pred.values.ravel())[0]
+            all_c.append(coefs), all_int.append(intercept)
+            all_corr.append(corr)
+        c = xr.DataArray(
+            np.mean(np.array(all_c), axis=0), coords={
+                'variable': x_vars}, dims='variable')
+        corr, intercept = np.mean(all_corr), np.mean(all_int)
+        return(c, corr, intercept)
+
+
+    def new(self, y_vars=[], x_vars=[], a=1):
+
+        self.mix(a)
+        if x_vars == []:
+            x_vars = self.vars
         else:
-            d_yrf = (d1.sel(time=slice("{:04d}".format(yrf-tail+1) + '-01-01',
-                            "{:04d}".format(yrf) + '-12-31'))
-                       .groupby(by).mean('time'))
+            pass
 
-        d1_steps = d1_ac.roll({t_dim: -1}, roll_coords=False) - d1_ac
-        full_steps = d_yrf.roll({t_dim: -1}, roll_coords=False) - d1_yr0
-        opt_steps = d1_steps + a * (full_steps - d1_steps)/(yrf - yr0 + 1)
+        # Get regression variables
+        if len(y_vars) > 0:
+            c, corr, intercept = [], [], []
+            for yi in y_vars:
+                ci, corr_i, intercept_i = self.regression(yi, x_vars)
+                c.append(ci), corr.append(corr_i), intercept.append(intercept_i)
 
-        self.rand = []
-        self.snap_list = []
-        out_vars = []
+            # Matrices of regression coeffs, corrs, and intercepts
+            c = xr.concat(c, 'y_var').assign_coords(y_var=y_vars)
+            intercept = xr.DataArray(
+                intercept, dims=['y_var'], coords={'y_var': y_vars})
+            corr = xr.DataArray(corr, dims=['variable'], coords={'variable': y_vars})
 
-        if debug:
-            print('New loop', opt_steps)
+        # Build new data for x_vars (i.e. vars that do not require regression)
+        # Ux = self.v1[x_vars].to_array('x_var')
+        # Ux = self.v1[x_vars]
+        Ux = self.v1
+        ctime = Ux.time.to_index()
 
-        for vi in range(nvars):
-            var = main_vars[vi]
+        for i in range(len(ctime) - 1):
 
-            new_var = d1[var]
-            ctime = new_var.coords['time'].to_index()
-            new_var = xr.where(new_var.time == ctime[0],
-                               d1_yr0.isel({t_dim: 0})[var], new_var)
+            t_sel = {self.t_dim: getattr(ctime[i], self.t_dim)}
 
-            for i in range(len(new_var['time']) - 1):
-                # Step is calculated based on previous plus opt_step
+            # Calculate adjusted center of normal distribution for next step
+            norm_center = (((self.V.sel(t_sel) - Ux.isel(time=i)) /
+                           self.DV.sel(t_sel))).to_array()
+            norm_center = xr.where(np.isfinite(norm_center), norm_center, 0)
+            r_norm = xr.DataArray(
+                np.random.normal(norm_center),
+                dims=['variable'], coords={'variable': self.vars})
 
-                new_step = ((new_var.isel(time=i).copy() + opt_steps[var].sel(
-                        {t_dim: getattr(ctime[i], t_dim)}, method='nearest'))
-                                   .assign_coords(time=xr.DataArray(ctime[i+1])))
+            # Add a step amount based on random draw from normal distribution
+            # multiplied by standard deviation added to optimum step
+            new_step = (Ux.isel(time=i) + self.OS.sel(t_sel) +
+                        (self.DS.sel(t_sel) * r_norm.to_dataset('variable')))
 
-                if debug and i == debug_step:
-                    print('\n[OCR debug] Date of loop: '+str(ctime[i]) +
-                          ', Date of replacement '+str(ctime[i+1]))
-                    print('[OCR debug] New_step from opt_step sum')
-                    print(new_step)
-                    print('from sum of')
-                    print((new_var.isel(time=i).copy(deep=True)))
-                    print('and')
-                    print(opt_steps[var].sel(
-                        {t_dim: getattr(ctime[i], t_dim)}, method='nearest'))
+            # Calculate y_vars using regression and update random var
+            # assignment proportionally to the correlation var
+            y_pred = (((new_step[x_vars].to_array() * c).sum('variable') + intercept))
+            new_step = new_step.update(
+                y_pred.to_dataset('y_var') * corr +
+                new_step[y_vars] * (1-corr)).squeeze()
 
-                # Some standard deviation added based on average of std for
-                # step i and step i+1
+            # Replace values that exceed min/max with min/max values
+            new_step = xr.where(new_step < self.var_lims.sel(bound='min'),
+                                self.var_lims.sel(bound='min'), new_step)
+            new_step = xr.where(new_step > self.var_lims.sel(bound='max'),
+                                self.var_lims.sel(bound='max'), new_step)
+            Ux = xr.where(Ux.time == xr.DataArray(ctime[i + 1]), new_step, Ux)
 
-                add_step_std = (step_std.sel(
-                    {t_dim: [getattr(ctime[i], t_dim),
-                             getattr(ctime[i+1], t_dim)]})
-                                        .mean(t_dim))[var]
-
-                add_blur_std = (blur_std.sel(
-                    {t_dim: [getattr(ctime[i], t_dim),
-                             getattr(ctime[i+1], t_dim)]})
-                                        .mean(t_dim))[var]
-
-                # produce some randomness (or load it from previous)
-                if load_rand is not None:
-                    r1, r2 = load_rand[i]
-                else:
-                    if vi == 0:
-                        r1, r2 = np.random.normal(), np.random.normal()
-                    else:
-                        r1, r2 = self.rand[i]
-                self.rand.append((r1, r2))
-
-                new_step = (new_step + r1 * add_step_std * step_std_a[var]/50. +
-                            r2 * add_blur_std * blur_std_a[var]/50.)
-
-                if debug and i == debug_step:
-                    print('[OCR debug] New_step after the addition of randomness')
-                    print(new_step)
-
-                # Normalize snapping envelope to 5 standard deviations default
-                # unless snap is 0
-                if snap[var] == 0:
-                    snap_amt = 0
-                else:
-                    dev_from_base = (np.abs(
-                        new_step - base_ac[var].sel(
-                            {t_dim: getattr(ctime[i+1], t_dim)})) /
-                        (add_step_std * (15-snap[var])))
-
-                    dev_from_base = xr.where(dev_from_base > 1, 1, dev_from_base)
-                    dev_from_base = xr.where(np.isnan(dev_from_base), 1, dev_from_base)
-                    snap_amt = dev_from_base**((50 - snap_atten[var])/5)
-                    new_step = (
-                        snap_amt * self.base_data[var].sel({'time': ctime[i+1]}) +
-                        (1 - snap_amt) * new_step)
-
-                self.snap_list.append(snap_amt)
-
-                if debug and i == debug_step:
-                    print('[OCR debug] New_step after snapping')
-                    print(new_step)
-                    print(' by amount ')
-                    print(snap_amt)
-
-                # Replace variables that exceed min or max with min/max values
-                new_step = filter_minmax(new_step, var_min[var], var_max[var])
-
-                if debug and i == debug_step:
-                    print('[OCR debug] New_step after filter_minmax')
-                    print(new_step)
-
-                # modify the array!
-                mask = (new_var.coords['time'] == xr.DataArray(ctime[i+1]))
-
-                new_var = xr.where(mask, new_step, new_var)
-
-                if debug and i == debug_step:
-                    print('Replaced new step looks like: ')
-                    print(new_var)
-
-            # enhance contrast
-            if hist_stretch[var]:
-                # Histogram stretching only supported for spatially averaged
-                # data at the moment
-                in_mean = new_var.mean('time')
-                in_std = new_var.std('time')
-                contrast_lims = [in_mean-in_std, in_mean+in_std]
-                c_range = contrast_lims[1]-contrast_lims[0]
-
-                if var_min[var] is not None:
-                    out_min = var_min[var]
-                else:
-                    out_min = min0[var].item()
-                if var_max[var] is not None:
-                    out_max = var_max[var]
-                else:
-                    out_max = max0[var]
-
-                if debug:
-                    print('\n[OCR debug] Starting hist_stretch. Min/max: ')
-                    print(out_min, out_max)
-
-                hist_var = (c_dist[var](
-                    ((new_var - contrast_lims[0]) /
-                     c_range), **hist_args[var]) * (out_max - out_min) + out_min)
-
-                cond = xr.DataArray((new_var > contrast_lims[0]) &
-                                    (new_var < contrast_lims[1]), dims=['time'])
-                new_var = xr.where(cond, hist_var, new_var)
-                new_var = filter_minmax(new_var, var_min[var], var_max[var])
-
-            if combine_steps > 1:
-                new_var = new_var.resample(time=fby).interpolate()
-
-            new_var.name = var
-            try:
-                out_vars.append(new_var.drop(t_dim))
-            except KeyError:
-                out_vars.append(new_var)
-
-        # print(out_vars)
-        new_ds = xr.merge(out_vars)
-        new_ds.attrs = data1.attrs
-        if plot:
-            plot_sa(new_ds, 'new')
-        self.new = new_ds
-
-
-def filter_minmax(dataset, var_min, var_max):
-
-    if var_min is not None:
-        # mina = np.ones(len(dataset['time'])) * var_min
-        dataset = xr.where(
-            dataset < var_min, var_min,
-            dataset)
-
-    if var_max is not None:
-        # maxa = np.ones(len(dataset['time'])) * var_max
-        dataset = xr.where(
-            dataset > var_max, var_max,
-            dataset)
-
-    return(dataset)
-
-
-def try_dict(kwargs, kw, except_val, main_vars, vector=False):
-
-    # If kwarg given, try to use it to fill params
-    try:
-        ndict = kwargs[kw]
-        # If kwarg given, but its not a dictionary set it to the except_val
-        if not isinstance(ndict, dict):
-            except_val = ndict
-            ndict = {}
-    # Otherwise, set them all according to except_val
-    except KeyError:
-        ndict = {}
-
-    # Check to see if all vars in ndict, otherwise fill with except_val
-    for vi in main_vars:
-        try:
-            ndict[vi]
-        except KeyError:
-            ndict[vi] = except_val
-
-    return(ndict)
+        return(Ux)
 
 
 def get_groupings(dt):

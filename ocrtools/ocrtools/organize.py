@@ -276,7 +276,7 @@ def reformatted_fname(dataset, dt, dpath=True, **kwargs):
     except TypeError:
         yr0 = "{:04d}".format(np.amin(time_range.year))
         yrf = "{:04d}".format(np.amax(time_range.year))
-    fname_dict = {'all_vars': '_'.join(dataset.attrs['main_vars']),
+    fname_dict = {'all_vars': '_'.join(list(dataset.data_vars)),
                   'yr_range': yr0 + '-' + yrf, 'dt': dt, 'ending': 'nc'}
 
     try:

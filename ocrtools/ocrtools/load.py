@@ -189,7 +189,7 @@ def load(data, var=[], interactive=True, drop=True, **kwargs):
 
             else:
                 if ',' in v0:
-                    var = str.strip(v0.split(','))
+                    var = [s.strip() for s in v0.split(',')]
                 elif isinstance(v0, str):
                     var = [v0]
         else:
