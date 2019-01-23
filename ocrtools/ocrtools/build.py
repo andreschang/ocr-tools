@@ -9,18 +9,65 @@
 ########################################
 
 import xarray as xr
-import pandas as pd
 from scipy import signal
-from ocrtools.tk_selector import plt
-from ocrtools.explore import spatial_average
 import numpy as np
-from ocrtools.build_params import alabels, conversions, ylim
+
+# Conversion functions
+
+
+def mps_2_cmpday(data):
+    t_day = 60.*60.*24.   # seconds * minutes * hours
+    lconvert = data * t_day * 100
+    return lconvert
+
+
+def K_2_F(data):
+    t_f = data * (9./5.) - 459.67
+    return t_f
+
+
+def mmH2O_2_inSNO(data):
+    # http://webarchiv.ethz.ch/arolla/Arolla_Data/SnowConditions/depth_to_swe.pdf
+    # https://bit.ly/2Cpc4nR
+    H2O_row = 997  # kg/m^3
+    SNO_row = 100  # kg/m^3
+    mm_2_inch = 0.0393701
+    mmSNO = (mm_2_inch * H2O_row/SNO_row) * data
+    return(mmSNO)
+
+
+def mmps_2_cmday(data):
+    return mps_2_cmpday(data/1000.)
+
+
+def percentify(data): return 100 * data
+
+
+def inverse(data): return 100 * (1-data)
+
+
+# Conversion and plotting settings
+ylabels = {'TS': 'Temperature (F)', 'PRECT': 'Precipitation (cm/day)',
+           'RAIN': 'Precipitation (cm/day)', 'H2OSNO': 'Snow cover (in)',
+           'TREFHT': 'Temperature (F)', 'RELHUM': 'Relative humidity (%)',
+           'FSNSCLOUD': "Cloudiness (% SW energy blocked)"}
+conversions = {'PRECT': mps_2_cmpday, 'TS': K_2_F, 'RAIN': mmps_2_cmday,
+               'H2OSNO': mmH2O_2_inSNO, 'TREFHT': K_2_F, 'RELHUM': percentify,
+               'FSNSCLOUD': inverse}
+ylim = {'PRECT': [0, 20], 'TS': [0, 100], 'RAIN': [0, 20], 'H2OSNO': [0, 10],
+        'TREFHT': [0, 100], 'FSNSCLOUD': [0, 80], 'RELHUM': [60, 100]}
+
+
+# Build settings
+var_lims = {'PRECT': [0, 1000], 'TS': [0, 1000], 'RAIN': [0, 1000],
+            'H2OSNO': [0, 1000], 'FSNSCLOUD': [0, 100], 'TREFHT': [0, 1000],
+            'RELHUM': [0, 100]}
 
 
 class build(object):
 
-    def __init__(self, data1, var_lims, data2=None, combine_steps=1,
-                 head=1, tail=1, savgol_window=0):
+    def __init__(self, data1, data2=None, var_lims=var_lims, combine_steps=1,
+                 head=1, tail=1, savgol_window=0, y_vars=[], x_vars=[]):
         """
         Makes new climate data based on existing modeled data and user options
         using a step-wise approach (i.e. OCR Tools calculates each timestep in
@@ -100,6 +147,26 @@ class build(object):
             self.DV2, self.DS2 = None, None
             self.F = None
 
+        # Get regression variables
+        self.y_vars = y_vars
+        if y_vars == []:
+            self.x_vars = self.vars
+        else:
+            self.x_vars = x_vars
+
+        if len(self.y_vars) > 0:
+            c, corr, intercept = [], [], []
+            for yi in y_vars:
+                ci, corr_i, intercept_i = self.regression(yi, x_vars)
+                c.append(ci), corr.append(corr_i), intercept.append(intercept_i)
+
+            # Matrices of regression coeffs, corrs, and intercepts
+            self.c = xr.concat(c, 'y_var').assign_coords(y_var=y_vars)
+            self.intercept = xr.DataArray(
+                intercept, dims=['y_var'], coords={'y_var': y_vars})
+            self.corr = xr.DataArray(
+                corr, dims=['y_var'], coords={'y_var': y_vars})
+
     def mix(self, a):
 
         def scenario_merge(data1, data2):
@@ -148,31 +215,10 @@ class build(object):
         corr, intercept = np.mean(all_corr), np.mean(all_int)
         return(c, corr, intercept)
 
-
-    def new(self, y_vars=[], x_vars=[], a=1):
+    def new(self, a=1, unravel=0):
 
         self.mix(a)
-        if x_vars == []:
-            x_vars = self.vars
-        else:
-            pass
 
-        # Get regression variables
-        if len(y_vars) > 0:
-            c, corr, intercept = [], [], []
-            for yi in y_vars:
-                ci, corr_i, intercept_i = self.regression(yi, x_vars)
-                c.append(ci), corr.append(corr_i), intercept.append(intercept_i)
-
-            # Matrices of regression coeffs, corrs, and intercepts
-            c = xr.concat(c, 'y_var').assign_coords(y_var=y_vars)
-            intercept = xr.DataArray(
-                intercept, dims=['y_var'], coords={'y_var': y_vars})
-            corr = xr.DataArray(corr, dims=['variable'], coords={'variable': y_vars})
-
-        # Build new data for x_vars (i.e. vars that do not require regression)
-        # Ux = self.v1[x_vars].to_array('x_var')
-        # Ux = self.v1[x_vars]
         Ux = self.v1
         ctime = Ux.time.to_index()
 
@@ -181,31 +227,40 @@ class build(object):
             t_sel = {self.t_dim: getattr(ctime[i], self.t_dim)}
 
             # Calculate adjusted center of normal distribution for next step
+            # print('AAA')
+            # print(self.V)
+            # print(self.v1)
+            # print(Ux)
+            # print(self.DV)
+            # print(((self.V.sel(t_sel) - Ux.isel(time=i)) /
+            #                self.DV.sel(t_sel)))
             norm_center = (((self.V.sel(t_sel) - Ux.isel(time=i)) /
-                           self.DV.sel(t_sel))).to_array()
+                           self.DV.sel(t_sel))).to_array() * (1 - unravel)
             norm_center = xr.where(np.isfinite(norm_center), norm_center, 0)
             r_norm = xr.DataArray(
                 np.random.normal(norm_center),
                 dims=['variable'], coords={'variable': self.vars})
-
             # Add a step amount based on random draw from normal distribution
             # multiplied by standard deviation added to optimum step
             new_step = (Ux.isel(time=i) + self.OS.sel(t_sel) +
                         (self.DS.sel(t_sel) * r_norm.to_dataset('variable')))
-
             # Calculate y_vars using regression and update random var
             # assignment proportionally to the correlation var
-            y_pred = (((new_step[x_vars].to_array() * c).sum('variable') + intercept))
+            y_pred = (((new_step[self.x_vars].to_array() * self.c)
+                      .sum('variable') + self.intercept))
             new_step = new_step.update(
-                y_pred.to_dataset('y_var') * corr +
-                new_step[y_vars] * (1-corr)).squeeze()
+                (y_pred * self.corr +
+                 new_step[self.y_vars].to_array('y_var') *
+                 (1-self.corr)).to_dataset('y_var'))
 
             # Replace values that exceed min/max with min/max values
             new_step = xr.where(new_step < self.var_lims.sel(bound='min'),
                                 self.var_lims.sel(bound='min'), new_step)
             new_step = xr.where(new_step > self.var_lims.sel(bound='max'),
                                 self.var_lims.sel(bound='max'), new_step)
-            Ux = xr.where(Ux.time == xr.DataArray(ctime[i + 1]), new_step, Ux)
+            Ux = xr.where(
+                Ux.time == xr.DataArray(ctime[i + 1]),
+                new_step, Ux)
 
         return(Ux)
 

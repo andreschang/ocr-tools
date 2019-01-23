@@ -50,11 +50,12 @@ def xr_load(path, average=False, standardize=True, **kwargs):
     return(d)
 
 
-def noleap_2_datetime(data, dt, **kwargs):
+def noleap_2_datetime(data, **kwargs):
 
+    dt0 = int(data.time[1]-data.time[0])
+    dt = 'daily' if dt0 < 2.3e15 else 'monthly'
     by, fby = get_groupings(dt)
     t = data['time']
-    # t = time0.to_index()
 
     try:
         yr0, yrf = np.amin(t.to_index().year), np.amax(t.to_index().year)
@@ -131,7 +132,6 @@ def standardize_coords(dataset, center=True):
 
             dataset.coords[ci] = dataset.coords[c_key]
 
-
     return(dataset)
 
 
@@ -142,9 +142,9 @@ def load(data, var=[], interactive=True, drop=True, **kwargs):
     Args:
     * data (str or xarray.Dataset): either an xarray dataset or a path to
     netCDF that will be read in by xr_load function
-    * var (string): name of main variable (optional)
+    * var (list or str): list of desired variable or main var (optional)
     * interactive (bool): instructions for the less-experienced programmer :)
-    * drop (bool): if True and var(s) specified, other vars are removed from
+    * drop (bool): if True and var specified, other data_vars are removed from
     the dataset
     """
 
@@ -193,14 +193,11 @@ def load(data, var=[], interactive=True, drop=True, **kwargs):
                 elif isinstance(v0, str):
                     var = [v0]
         else:
-            var = [x for x in ds.data_vars]
+            var = list(ds.data_vars)
             print('\n[OCR] Main variable: ' + var[0])
             print(ds[var[0]])
-
-    if all(vi in ds for vi in var):
-        ds.attrs['main_vars'] = var
-    else:
-        raise ValueError('main_vars must specify data variables in the xarray')
+    elif var == []:
+        var = list(ds.data_vars)
 
     # Standardize coordinate names
     try:
@@ -209,7 +206,7 @@ def load(data, var=[], interactive=True, drop=True, **kwargs):
         ds = standardize_coords(ds)
 
     if drop:
-        ds = ds[ds.main_vars]
+        ds = ds[var]
 
     if interactive:
         print('\n[OCR] Load complete. Dataset contents:')

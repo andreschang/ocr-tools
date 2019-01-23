@@ -18,7 +18,7 @@ cesm_fname = ['compset', 'code_base', 'compset_short', 'res_short', 'desc',
               'nnn', 'scomp', 'type', 'string', 'date', 'ending']
 cesmLE_map = {'compset': 'b', 'code_base': 'e11', 'res_short': 'f09_g16',
               'ending': 'nc'}
-formatted_fname = ['pre', 'all_vars', 'yr_range', 'dt', 'id', 'post', 'ending']
+formatted_fname = ['pre', 'var', 'yr_range', 'dt', 'id', 'post', 'ending']
 
 top_directory = '/Volumes/Samsung_T5/Open_Climate_Research-Projects/data'
 
@@ -276,7 +276,7 @@ def reformatted_fname(dataset, dt, dpath=True, **kwargs):
     except TypeError:
         yr0 = "{:04d}".format(np.amin(time_range.year))
         yrf = "{:04d}".format(np.amax(time_range.year))
-    fname_dict = {'all_vars': '_'.join(list(dataset.data_vars)),
+    fname_dict = {'var': '_'.join(list(dataset.data_vars)),
                   'yr_range': yr0 + '-' + yrf, 'dt': dt, 'ending': 'nc'}
 
     try:
@@ -296,7 +296,7 @@ def reformatted_fname(dataset, dt, dpath=True, **kwargs):
 
     if dpath:
         dpath_dict = {'type': 'reformatted', 'dt': dt,
-                      'var': fname_dict['all_vars'], 'file': path0}
+                      'var': fname_dict['var'], 'file': path0}
         try:
             dpath_dict['src'] = kwargs['src']
         except KeyError:
