@@ -54,7 +54,7 @@ ylabels = {'TS': 'Temperature (F)', 'PRECT': 'Precipitation (cm/day)',
 conversions = {'PRECT': mps_2_cmpday, 'TS': K_2_F, 'RAIN': mmps_2_cmday,
                'H2OSNO': mmH2O_2_inSNO, 'TREFHT': K_2_F, 'RELHUM': percentify,
                'FSNSCLOUD': inverse}
-ylim = {'PRECT': [0, 20], 'TS': [0, 100], 'RAIN': [0, 20], 'H2OSNO': [0, 10],
+ylim = {'PRECT': [0, 20], 'TS': [0, 100], 'RAIN': [0, 20], 'H2OSNO': [0, 5],
         'TREFHT': [0, 100], 'FSNSCLOUD': [0, 80], 'RELHUM': [60, 100]}
 
 
@@ -173,12 +173,14 @@ class build(object):
             if data2 is None:
                 return data1
             else:
-                return (1 - a) * data1 + a * data2
+                am = 1 if a > 1 else a
+                return (1 - am) * data1 + am * data2
 
         self.V = scenario_merge(self.V1, self.V2)
-        self.OS = scenario_merge(self.S1, self.F)
+        self.OS = self.S1 + a * (self.F - self.S1) / (self.yrf - self.yr0)
         self.DV = scenario_merge(self.DV1, self.DV2)
         self.DS = scenario_merge(self.DS1, self.DS2)
+        self.Ux = scenario_merge(self.v1, self.v2)
 
     def regression(self, y_var, x_vars):
         from sklearn.linear_model import LinearRegression
@@ -187,6 +189,7 @@ class build(object):
         from scipy.stats import pearsonr
 
         vn = [self.v1]
+
         if self.V2 is not None:
             vn.append(self.v1)
 
@@ -218,23 +221,14 @@ class build(object):
     def new(self, a=1, unravel=0):
 
         self.mix(a)
-
-        Ux = self.v1
-        ctime = Ux.time.to_index()
+        ctime = self.Ux.time.to_index()
 
         for i in range(len(ctime) - 1):
 
             t_sel = {self.t_dim: getattr(ctime[i], self.t_dim)}
 
             # Calculate adjusted center of normal distribution for next step
-            # print('AAA')
-            # print(self.V)
-            # print(self.v1)
-            # print(Ux)
-            # print(self.DV)
-            # print(((self.V.sel(t_sel) - Ux.isel(time=i)) /
-            #                self.DV.sel(t_sel)))
-            norm_center = (((self.V.sel(t_sel) - Ux.isel(time=i)) /
+            norm_center = (((self.V.sel(t_sel) - self.Ux.isel(time=i)) /
                            self.DV.sel(t_sel))).to_array() * (1 - unravel)
             norm_center = xr.where(np.isfinite(norm_center), norm_center, 0)
             r_norm = xr.DataArray(
@@ -242,27 +236,28 @@ class build(object):
                 dims=['variable'], coords={'variable': self.vars})
             # Add a step amount based on random draw from normal distribution
             # multiplied by standard deviation added to optimum step
-            new_step = (Ux.isel(time=i) + self.OS.sel(t_sel) +
+            new_step = (self.Ux.isel(time=i) + self.OS.sel(t_sel) +
                         (self.DS.sel(t_sel) * r_norm.to_dataset('variable')))
             # Calculate y_vars using regression and update random var
             # assignment proportionally to the correlation var
-            y_pred = (((new_step[self.x_vars].to_array() * self.c)
-                      .sum('variable') + self.intercept))
-            new_step = new_step.update(
-                (y_pred * self.corr +
-                 new_step[self.y_vars].to_array('y_var') *
-                 (1-self.corr)).to_dataset('y_var'))
+            if self.y_vars != []:
+                y_pred = (((new_step[self.x_vars].to_array() * self.c)
+                          .sum('variable') + self.intercept))
+                new_step = new_step.update(
+                    (y_pred * self.corr +
+                     new_step[self.y_vars].to_array('y_var') *
+                     (1-self.corr)).to_dataset('y_var'))
 
             # Replace values that exceed min/max with min/max values
             new_step = xr.where(new_step < self.var_lims.sel(bound='min'),
                                 self.var_lims.sel(bound='min'), new_step)
             new_step = xr.where(new_step > self.var_lims.sel(bound='max'),
                                 self.var_lims.sel(bound='max'), new_step)
-            Ux = xr.where(
-                Ux.time == xr.DataArray(ctime[i + 1]),
-                new_step, Ux)
+            self.Ux = xr.where(
+                self.Ux.time == xr.DataArray(ctime[i + 1]),
+                new_step, self.Ux)
 
-        return(Ux)
+        return(self.Ux)
 
 
 def get_groupings(dt):

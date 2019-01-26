@@ -13,4 +13,3 @@ from ocrtools.tk_selector import *
 from ocrtools.explore import *
 from ocrtools.organize import *
 from ocrtools.build import *
-from ocrtools.build_params import *
