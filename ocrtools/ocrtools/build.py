@@ -9,8 +9,9 @@
 ########################################
 
 import xarray as xr
-from scipy import signal
+from scipy import signal, interpolate
 import numpy as np
+import pandas as pd
 
 # Conversion functions
 
@@ -67,7 +68,7 @@ var_lims = {'PRECT': [0, 1000], 'TS': [0, 1000], 'RAIN': [0, 1000],
 class build(object):
 
     def __init__(self, data1, data2=None, var_lims=var_lims, combine_steps=1,
-                 head=1, tail=1, savgol_window=0, y_vars=[], x_vars=[]):
+                 head=1, tail=1, savgol_window=0, y_vars=[], x_vars=[], debug=True):
         """
         Makes new climate data based on existing modeled data and user options
         using a step-wise approach (i.e. OCR Tools calculates each timestep in
@@ -99,6 +100,7 @@ class build(object):
             return(dataset)
 
         # Set parameters ======================================================
+        self.debug = debug
         self.vars = list(data1.data_vars)
         dt0 = int(data1.time[1]-data1.time[0])
         self.dt = 'daily' if dt0 < 2.3e15 else 'monthly'
@@ -119,6 +121,8 @@ class build(object):
         self.DV1 = self.v1.groupby(self.by).std('time')
         self.DS1 = s1.groupby(self.by).std('time')
         self.max0, self.min0 = np.amax(self.v1), np.amin(self.v1)
+        self.nt = self.V1.dims[self.t_dim]
+        self.nyrs = self.yrf-self.yr0+1
 
         # Do the same for data2 if given, otherwise refer always to data1
         if data2 is not None:
@@ -126,21 +130,22 @@ class build(object):
             self.v2 = apply_savgol(self.v2)
             s2 = self.v2.roll({'time': -1}, roll_coords=False) - self.v2
             self.V2 = self.v2.groupby(self.by).mean('time')
-            # self.S2 = s2.groupby(self.by).mean('time')
+            self.S2 = s2.groupby(self.by).mean('time')
             self.DV2 = self.v2.groupby(self.by).std('time')
             self.DS2 = s2.groupby(self.by).std('time')
 
             self.max0 = np.amax(self.v2) if np.amax(self.v2) > self.max0 else self.max0
             self.min0 = np.amin(self.v2) if np.amin(self.v2) < self.min0 else self.min0
-            v2_tail = (self.v2.sel(
+            self.v2_tail = (self.v2.sel(
                 time=slice("{:04d}".format(self.yrf - tail + 1) + '-01-01',
                            "{:04d}".format(self.yrf) + '-12-31'))
                        .groupby(self.by).mean('time'))
-            v1_head = (self.v2.sel(
+            self.v1_head = (self.v1.sel(
                 time=slice("{:04d}".format(self.yr0) + '-01-01',
                            "{:04d}".format(self.yr0 + head - 1) + '-12-31'))
                        .groupby(self.by).mean('time'))
-            self.F = v2_tail.roll({self.t_dim: -1}, roll_coords=False) - v1_head
+
+            # self.F = self.v2_tail.roll({self.t_dim: -1}, roll_coords=False) - self.v1_head
 
         else:
             self.V2, self.S2 = None, None
@@ -177,10 +182,52 @@ class build(object):
                 return (1 - am) * data1 + am * data2
 
         self.V = scenario_merge(self.V1, self.V2)
-        self.OS = self.S1 + a * (self.F - self.S1) / (self.yrf - self.yr0)
         self.DV = scenario_merge(self.DV1, self.DV2)
         self.DS = scenario_merge(self.DS1, self.DS2)
-        self.Ux = scenario_merge(self.v1, self.v2)
+
+        # Interpolation function
+        def rs(group):
+            g = group.resample(time='1YS').interpolate('linear')
+            return(g)
+
+        # Get annual step cycle of S1 head and S2 tail 
+        # Step: delta from e.g. Jan to Feb, with coordinate aligned to Jan
+        SH1 = ((self.v1_head.roll({self.t_dim: -1}, roll_coords=False) - self.v1_head))
+        ST2 = ((self.v2_tail.roll({self.t_dim: -1}, roll_coords=False) - self.v2_tail))
+        ones = xr.DataArray(np.ones((self.nyrs, self.nt)), dims=['year', self.t_dim])
+
+        # Interpolate step cycle for all years between S1 and S2
+        OS = (xr.concat([SH1, ST2], 'time')
+                .assign_coords(time=self.v1.time[[0, -self.nt]])
+                .groupby(self.t_dim).apply(rs)
+                .rename({'time': 'year'})
+                .stack(time=('year', 'month'))
+                .assign_coords(time=self.v1.time))
+
+        # Add an amount to each month equal to the total delta between S2 tail and S2 head,
+        # divided by total number of years and self.nt
+        F = (a * (self.v2_tail - self.v1_head) / (self.nyrs * self.nt))
+
+        # Add F to OS, but shift backward by one month because this is a step
+        # (i.e. Jan to Feb), not an amount added to each month
+        self.OS = (OS + (
+            F.roll({self.t_dim: -1}, roll_coords=False) * ones)
+            .stack(time=('year', 'month')).assign_coords(time=OS.time))
+
+        # Make a scenario from v1 with all steps added. Just cumulative sum of all opt_steps
+        # where time0 is equal to v1
+        OSx = xr.where(
+            self.OS.time == np.amax(self.OS.time), self.v1.isel(time=0), self.OS).roll(
+                {'time': 1}, roll_coords=False)
+        self.Ux = np.cumsum(OSx)
+
+        if self.debug:
+            from ocrtools import plt
+            for vi in self.vars:
+                self.Ux[vi].plot()
+                plt.show()
+                plt.close()
+
 
     def regression(self, y_var, x_vars):
         from sklearn.linear_model import LinearRegression
@@ -218,7 +265,7 @@ class build(object):
         corr, intercept = np.mean(all_corr), np.mean(all_int)
         return(c, corr, intercept)
 
-    def new(self, a=1, unravel=0):
+    def new(self, a=1, unravel=0, debug=False):
 
         self.mix(a)
         ctime = self.Ux.time.to_index()
