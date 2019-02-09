@@ -10,9 +10,14 @@
 
 from setuptools import setup, find_packages
 
+with open("README.md", "r") as fh:
+    long_description = fh.read()
+
 setup(name='ocrtools',
       version='0.1.0',
       description='Tools for interpreting and generating new climate data',
+      long_description=long_description,
+      long_description_content_type='text/markdown',
       url='https://github.com/andreschang/ocr-tools',
       author='Andres Chang',
       author_email='andresdanielchang@gmail.com',
