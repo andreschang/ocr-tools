@@ -17,4 +17,8 @@ setup(name='ocrtools',
       author='Andres Chang',
       author_email='andresdanielchang@gmail.com',
       license='MIT',
-      packages=find_packages())
+      packages=find_packages(),
+      python_requires='>=3',
+      install_requires=[
+        'numpy', 'geopy', 'matplotlib', 'xarray', 'pandas', 'scipy',
+        'tkinter', 'xarray'])

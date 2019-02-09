@@ -11,7 +11,7 @@
 # Google Maps polygon coordinates tool for future implementation
 # https://codepen.io/jhawes/pen/ujdgK
 # http://www.gis.osu.edu/misc/map-projections/
-from tkinter import Canvas, PhotoImage, mainloop
+from tkinter import Tk, Canvas, PhotoImage, mainloop
 import os
 import matplotlib
 matplotlib.use("TkAgg")
@@ -27,7 +27,9 @@ def get_dims():
         def __init__(self, parent=None):
             self.w, self.h = 611, 320
             self.merid = 180
-            canvas = Canvas(width=self.w, height=self.h)
+            master = Tk()
+            master.title('OCR Tools')
+            canvas = Canvas(master, width=self.w, height=self.h)
             canvas.pack()
             canvas.bind('<ButtonPress-1>', self.onStart)
             canvas.bind('<B1-Motion>', self.onGrow)
