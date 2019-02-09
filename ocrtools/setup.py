@@ -3,19 +3,18 @@
 
 ###############################################################################
 #
-#  OCRTOOLS - Making climate data malleable
+#  OCR TOOLS - Making climate data malleable
 #  Copyright (C) 2018 Andres Chang
 #
 ###############################################################################
 
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(name='ocrtools',
-      version='1.0',
-      description='Making climate data malleable',
+      version='0.1.0',
+      description='Tools for interpreting and generating new climate data',
       url='https://github.com/andreschang/ocr-tools',
       author='Andres Chang',
       author_email='andresdanielchang@gmail.com',
       license='MIT',
-      packages=['ocrtools'],
-      zip_safe=False)
+      packages=find_packages())

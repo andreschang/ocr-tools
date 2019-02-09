@@ -10,9 +10,7 @@
 
 import numpy as np
 import xarray as xr
-import cf_units
 import time
-from datetime import date
 import pandas as pd
 
 
@@ -365,4 +363,3 @@ def get_groupings(dt):
         by = 'time.date'
         fby = 'D'
     return(by, fby)
-

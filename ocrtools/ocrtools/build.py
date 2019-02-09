@@ -9,11 +9,8 @@
 ########################################
 
 import xarray as xr
-from scipy import signal, interpolate
+from scipy import signal
 import numpy as np
-import pandas as pd
-
-# Conversion functions
 
 
 def mps_2_cmpday(data):
@@ -28,8 +25,6 @@ def K_2_F(data):
 
 
 def mmH2O_2_inSNO(data):
-    # http://webarchiv.ethz.ch/arolla/Arolla_Data/SnowConditions/depth_to_swe.pdf
-    # https://bit.ly/2Cpc4nR
     H2O_row = 997  # kg/m^3
     SNO_row = 100  # kg/m^3
     mm_2_inch = 0.0393701
@@ -61,14 +56,15 @@ ylim = {'PRECT': [0, 20], 'TS': [0, 100], 'RAIN': [0, 20], 'H2OSNO': [0, 5],
 
 # Build settings
 var_lims = {'PRECT': [0., 1000.], 'TS': [0., 1000.], 'RAIN': [0., 1000.],
-            'H2OSNO': [0., 1000.], 'FSNSCLOUD': [0., 100.], 'TREFHT': [0., 1000.],
-            'RELHUM': [0., 100.]}
+            'H2OSNO': [0., 1000.], 'FSNSCLOUD': [0., 100.],
+            'TREFHT': [0., 1000.], 'RELHUM': [0., 100.]}
 
 
 class build(object):
 
     def __init__(self, data1, data2=None, var_lims=var_lims, combine_steps=1,
-                 head=1, tail=1, savgol_window=0, y_vars=[], x_vars=[], debug=False):
+                 head=1, tail=1, savgol_window=0, y_vars=[], x_vars=[],
+                 debug=False):
         """
         Makes new climate data based on existing modeled data and user options
         using a step-wise approach (i.e. OCR Tools calculates each timestep in
@@ -78,7 +74,8 @@ class build(object):
         def resample_each(data, combine_steps):
             if self.dt == 'monthly':
                 return (
-                    data.resample(time=str(combine_steps) + self.fby, keep_attrs=True)
+                    data.resample(time=str(combine_steps) + self.fby,
+                                  keep_attrs=True)
                         .mean('time'))
             elif self.dt == 'daily':
                 grouped_data = data.groupby('time.year')
@@ -138,8 +135,10 @@ class build(object):
             self.DV2 = self.v2.groupby(self.by).std('time')
             self.DS2 = s2.groupby(self.by).std('time')
 
-            self.max0 = np.amax(self.v2) if np.amax(self.v2) > self.max0 else self.max0
-            self.min0 = np.amin(self.v2) if np.amin(self.v2) < self.min0 else self.min0
+            self.max0 = (np.amax(self.v2) if np.amax(self.v2) > self.max0
+                         else self.max0)
+            self.min0 = (np.amin(self.v2) if np.amin(self.v2) < self.min0
+                         else self.min0)
             self.v2_tail = (self.v2.sel(
                 time=slice("{:04d}".format(self.yrf - tail + 1) + '-01-01',
                            "{:04d}".format(self.yrf) + '-12-31'))
@@ -164,7 +163,8 @@ class build(object):
             c, corr, intercept = [], [], []
             for yi in y_vars:
                 ci, corr_i, intercept_i = self.regression(yi, x_vars)
-                c.append(ci), corr.append(corr_i), intercept.append(intercept_i)
+                c.append(ci), corr.append(corr_i)
+                intercept.append(intercept_i)
 
             # Matrices of regression coeffs, corrs, and intercepts
             self.c = xr.concat(c, 'y_var').assign_coords(y_var=y_vars)
@@ -176,9 +176,9 @@ class build(object):
     def apply_var_lims(self, data):
         # Replace values that exceed min/max with min/max values
         data = xr.where(data < self.var_lims.sel(bound='min'),
-                            self.var_lims.sel(bound='min'), data)
+                        self.var_lims.sel(bound='min'), data)
         data = xr.where(data > self.var_lims.sel(bound='max'),
-                            self.var_lims.sel(bound='max'), data)
+                        self.var_lims.sel(bound='max'), data)
         return(data)
 
     def mix(self, a):
@@ -200,23 +200,26 @@ class build(object):
 
         # Softmax <3 normalizes all data to sum to one
         def softmax(data, dim):
-            """Compute softmax values for each sets of scores in x."""
             e_data = np.exp(data - np.max(data))
-            return e_data / e_data.sum(dim=dim) # only difference
+            return e_data / e_data.sum(dim=dim)
 
-        # weirdo function that ensures total sum of year steps, before F, is equal to zero
+        # weirdo function that ensures total sum of year steps, before F, = 0
         def normo(data):
             excess = data.sum()
             pos, neg = data.where(data >= 0), data.where(data < 0)
             data = xr.where(
-                data >= 0, data - excess/2 * softmax(pos, 'time'), data - excess/2 * softmax(neg, 'time'))
+                data >= 0, data - excess/2 * softmax(pos, 'time'),
+                data - excess/2 * softmax(neg, 'time'))
             return(data)
 
-        # Get annual step cycle of S1 head and S2 tail 
+        # Get annual step cycle of S1 head and S2 tail
         # Step: delta from e.g. Jan to Feb, with coordinate aligned to Jan
-        SH1 = ((self.v1_head.roll({self.t_dim: -1}, roll_coords=False) - self.v1_head))
-        ST2 = ((self.v2_tail.roll({self.t_dim: -1}, roll_coords=False) - self.v2_tail))
-        ones = xr.DataArray(np.ones((self.nyrs, self.nt)), dims=['year', self.t_dim])
+        SH1 = ((self.v1_head.roll({self.t_dim: -1}, roll_coords=False)
+               - self.v1_head))
+        ST2 = ((self.v2_tail.roll({self.t_dim: -1}, roll_coords=False)
+               - self.v2_tail))
+        ones = xr.DataArray(np.ones((self.nyrs, self.nt)),
+                            dims=['year', self.t_dim])
 
         # Interpolate step cycle for all years between S1 and S2
         OS = (xr.concat([SH1, ST2], 'time')
@@ -227,10 +230,10 @@ class build(object):
                 .assign_coords(time=self.v1.time))
         OS = OS.groupby('time.year').apply(normo)
 
-        # Add an amount that sums to the total, mean delta between v2_tail and v1_head weighted by
-        # step in year and distributed across n years evenly
+        # Add an amount that sums to the total, mean delta between v2_tail and
+        # v1_head weighted by step in year and distributed across n yrs evenly
         step_delt = (self.v2_tail - self.v1_head)
-        mean_delt = self.v2_tail.mean() - self.v1_head.mean() ## 
+        mean_delt = self.v2_tail.mean() - self.v1_head.mean()
         F = (a * softmax(step_delt, self.t_dim) * mean_delt) / (self.nyrs)
 
         # Add F to OS, but shift backward by one month because this is a step
@@ -239,11 +242,11 @@ class build(object):
             F.roll({self.t_dim: -1}, roll_coords=False) * ones)
             .stack(time=('year', self.t_dim)).assign_coords(time=OS.time))
 
-        # Make a scenario from v1 with all steps added. Just cumulative sum of all opt_steps
-        # where time0 is equal to v1
+        # Make a scenario from v1 with all steps added. Just cumulative sum of
+        # all opt_steps where time0 is equal to v1
         OS_V = xr.where(
-            self.OS.time == np.amax(self.OS.time), self.v1.isel(time=0), self.OS).roll(
-                {'time': 1}, roll_coords=False)
+            self.OS.time == np.amax(self.OS.time),
+            self.v1.isel(time=0), self.OS).roll({'time': 1}, roll_coords=False)
         self.V = self.apply_var_lims(
             np.cumsum(OS_V).assign_coords(time=self.v1.time))
 
@@ -260,7 +263,6 @@ class build(object):
                 plt.legend()
                 plt.show()
                 plt.close()
-
 
     def regression(self, y_var, x_vars):
         from sklearn.linear_model import LinearRegression

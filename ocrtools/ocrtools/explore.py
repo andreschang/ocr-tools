@@ -10,10 +10,6 @@
 
 import numpy as np
 import xarray as xr
-from ocrtools.tk_selector import plt
-import cf_units
-from datetime import date, datetime
-import pandas as pd
 
 
 def spatial_average(data, cell_area=None, **kwargs):
@@ -60,7 +56,8 @@ def spatial_average(data, cell_area=None, **kwargs):
             else:
                 weighted_mean = (
                     d0 * cell_area/cell_area.sum()).sum(
-                    dim=[n for n in d0.dims if n != 'time' and n != 'variable'])
+                    dim=[n for n in d0.dims
+                         if n != 'time' and n != 'variable'])
 
         if dataset_in:
             weighted_mean = weighted_mean.to_dataset(dim='variable')
@@ -100,24 +97,3 @@ def reg_wgt(latmin, latmax, nlat):
 
         wgts = wgts/(np.sum(wgts))
         return(wgts)
-
-
-# def tplot(data, dt, **kwargs):
-#     try:
-#         data.plot(**kwargs)
-#     except TypeError:
-#         data_pd = noleap_2_datetime(data, dt, **kwargs)
-#         data_pd.plot(**kwargs)
-
-
-# def get_groupings(dt):
-#     if dt == 'monthly':
-#         by = 'time.month'
-#         fby = 'MS'
-#     elif dt == 'daily':
-#         by = 'time.date'
-#         fby = 'D'
-#     return(by, fby)
-
-
-# def f4(num): return "{:04d}".format(num)

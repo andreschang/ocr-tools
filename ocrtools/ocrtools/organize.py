@@ -235,7 +235,8 @@ def load_cesmLE(var, dt, yr0, yrf, mem, **kwargs):
     print('\n[OCR] Requested CESM LE files were successfully found in ' + f0)
     load_cesm = [load(f0 + '/' + x, var=x.split('.')[7]
                                          .replace('_nh', '')
-                                         .replace('_sh', ''), dt=dt) for x in f_cesm]
+                                         .replace('_sh', ''), dt=dt)
+                 for x in f_cesm]
     t0 = '{:04d}'.format(yr0) + '-01-01'
     tf = '{:04d}'.format(yrf) + '-12-31'
     print(load_cesm[0].sel(time=slice(t0, tf)))
@@ -304,4 +305,3 @@ def reformatted_fname(dataset, dt, dpath=True, **kwargs):
         path0 = gen_path(directory_map, dpath_dict, '/', top=None)
 
     return(path0)
-

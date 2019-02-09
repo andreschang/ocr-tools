@@ -11,13 +11,11 @@
 # Google Maps polygon coordinates tool for future implementation
 # https://codepen.io/jhawes/pen/ujdgK
 # http://www.gis.osu.edu/misc/map-projections/
-from tkinter import *
-from PIL import Image, ImageTk
+from tkinter import Canvas, PhotoImage, mainloop
 import os
 import matplotlib
 matplotlib.use("TkAgg")
 from matplotlib import pyplot as plt
-
 
 dirname = os.path.dirname(__file__)
 
@@ -51,7 +49,8 @@ def get_dims():
 
         def onGrow(self, event):
             canvas = event.widget
-            if self.drawn: canvas.delete(self.drawn)
+            if self.drawn:
+                canvas.delete(self.drawn)
             objectId = self.shape(self.start.x, self.start.y, event.x, event.y)
             self.drawn = objectId
 
