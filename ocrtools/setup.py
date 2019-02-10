@@ -28,9 +28,6 @@ setup(name='ocrtools',
        'ftp://ftp.tcl.tk/pub/tcl/tcl8_6/tk8.6.8-src.tar.gz#egg=tkinter-8.6.8',
        'https://github.com/nbren12/sklearn-xarray#egg=sklearn_xarray-0.0.0'],
       install_requires=[
-        'numpy', 'geopy', 'matplotlib', 'xarray', 'pandas', 'scipy',
-        'xarray'],
-        extras_require={
-          'tk_selector': ['tkinter>8.6'],
-          'build_regression': ['sklearn_xarray==0.0.0']}
+        'numpy', 'geopy', 'matplotlib', 'xarray', 'pandas', 'scipy', 'tk',
+        'xarray']
       )
