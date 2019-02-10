@@ -11,7 +11,7 @@ package:
   version: {{ version }}
 
 source:
-  url: https://github.com/andreschang/{{ name }}/archive/{{ version }}.tar.gz
+  url: https://github.com/andreschang/{{ name }}/blob/master/archive/{{ version }}.tar.gz?raw=true
   # sha256: d58439c548433adcda98e695be53e526ba940a4b9c44fb9a05d92cd495cdd47f
   # sha256 is the prefered checksum -- you can get it for a file with:
   #  `openssl sha256 <file name>`.
