@@ -1,4 +1,0 @@
-include *.py
-recursive-include data *.nc
-recursive-include ocrtools *.csv
-recursive-include ocrtools *.gif

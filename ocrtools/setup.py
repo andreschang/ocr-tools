@@ -22,12 +22,5 @@ setup(name='ocrtools',
       author='Andres Chang',
       author_email='andresdanielchang@gmail.com',
       license='MIT',
-      packages=find_packages(),
-      python_requires='>=3',
-      dependency_links=[
-       'ftp://ftp.tcl.tk/pub/tcl/tcl8_6/tk8.6.8-src.tar.gz#egg=tkinter-8.6.8',
-       'https://github.com/nbren12/sklearn-xarray#egg=sklearn_xarray-0.0.0'],
-      install_requires=[
-        'numpy', 'geopy', 'matplotlib', 'xarray', 'pandas', 'scipy', 'tk',
-        'xarray']
+      packages=find_packages()
       )
