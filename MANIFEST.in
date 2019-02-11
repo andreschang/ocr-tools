@@ -1,0 +1,3 @@
+recursive-include ocrtools/var_lists *.csv
+recursive-include ocrtools/images *gif
+include data/raw/b.e11.B1850C5CN.f09_g16.005.cice.h.aice_nh.190001-199912.nc
