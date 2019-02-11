@@ -20,7 +20,7 @@ data = ['ocrtools/var_lists/cam_vars.csv',
              'ocrtools/images/lambert_cylindrical.gif']
 
 setup(name='ocrtools',
-      version='0.1.0',
+      version='0.1.1',
       description='Tools for interpreting and generating new climate data',
       long_description=long_description,
       long_description_content_type='text/markdown',
@@ -31,6 +31,7 @@ setup(name='ocrtools',
       packages=['ocrtools'],
       package_data={'ocrtools': data},
       python_requires='>=3.0',
-      install_requires=['numpy', 'matplotlib', 'pandas', 'xarray', 'geopy'],
+      install_requires=['numpy', 'matplotlib', 'pandas', 'xarray', 'geopy',
+                        'scipy'],
       setup_requires=["pytest-runner"],
       tests_require=["pytest"])
