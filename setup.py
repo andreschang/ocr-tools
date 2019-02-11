@@ -20,7 +20,7 @@ data = ['ocrtools/var_lists/cam_vars.csv',
              'ocrtools/images/lambert_cylindrical.gif']
 
 setup(name='ocrtools',
-      version='0.1.1',
+      version='0.1.2',
       description='Tools for interpreting and generating new climate data',
       long_description=long_description,
       long_description_content_type='text/markdown',
