@@ -229,6 +229,8 @@ def subset(dataset, scope):
     d_subset = dataset.sel(time=slice(t0, tf))
 
     def box_subset(d_in, lat_min, lat_max, lon_min, lon_max):
+        print(lat_min)
+        print(lat_max)
         d_out = d_in.where(
             (d_in.lat >= lat_min) &
             (d_in.lat <= lat_max) &
@@ -303,6 +305,8 @@ class scope(object):
         elif 'location' in kwargs:
             self.location = kwargs['location']
             scopes = scopes[0:2] + [scopes[-1]]
+        else:
+            scopes = scopes[0:-1]
 
         try:
             if(kwargs['z_min']):
