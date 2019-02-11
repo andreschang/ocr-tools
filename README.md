@@ -46,6 +46,7 @@ pip install ocrtools
   Enter yrf: 
   Select area(s) on map and close the pop-up window
   ```
+  
   <img src="http://andreschang.com/unlinked/tk_selector_screenshot.png" width=70%/>
 
 ```shell
