@@ -248,7 +248,7 @@ class build(object):
             self.OS.time == np.amax(self.OS.time),
             self.v1.isel(time=0), self.OS).roll({'time': 1}, roll_coords=False)
         self.V = self.apply_var_lims(
-            np.cumsum(OS_V).assign_coords(time=self.v1.time))
+            np.cumsum(OS_V, axis=0).assign_coords(time=self.v1.time))
 
         if self.debug:
             from ocrtools import plt
@@ -303,9 +303,10 @@ class build(object):
     def new(self, a=1, unravel=0, debug=False):
 
         self.mix(a)
-        Ux = self.V.copy()
+        Ux = self.V.copy().assign_coords(
+            lat=self.V1.coords['lat'],
+            lon=self.V1.coords['lon'])
         ctime = Ux.time.to_index()
-        # ctime = self.v1.time.to_index()
 
         for i in range(len(ctime) - 1):
 
@@ -318,7 +319,8 @@ class build(object):
 
             r_norm = xr.DataArray(
                 np.random.normal(norm_center),
-                dims=['variable'], coords={'variable': self.vars})
+                dims=list(norm_center.dims),
+                coords=norm_center.coords)
 
             # Add a step amount based on random draw from normal distribution
             # multiplied by standard deviation added to optimum step
@@ -336,7 +338,6 @@ class build(object):
 
             # Replace values that exceed min/max with min/max values
             new_step = self.apply_var_lims(new_step)
-
             Ux = xr.where(
                 Ux.time == xr.DataArray(ctime[i + 1]),
                 new_step, Ux)
