@@ -248,7 +248,7 @@ class build(object):
             self.OS.time == np.amax(self.OS.time),
             self.v1.isel(time=0), self.OS).roll({'time': 1}, roll_coords=False)
         self.V = self.apply_var_lims(
-            np.cumsum(OS_V, axis=0).assign_coords(time=self.v1.time))
+            (OS_V.cumsum(dim='time')).assign_coords(time=self.v1.time))
 
         if self.debug:
             from ocrtools import plt
