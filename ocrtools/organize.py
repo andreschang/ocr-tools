@@ -230,6 +230,12 @@ def load_cesmLE(var, dt, yr0, yrf, mem, **kwargs):
         f_yr0, f_yrf = opts[ni]
         fname = cesmLE_fname(var, dt, f_yr0, mem, **kwargs)
         f_cesm.append(fname)
+        if len(f_cesm) > 1:
+            if f_cesm[-1] == f_cesm[-2]:
+                raise ValueError(
+                '\n[OCR]File not found in expected location, ' +
+                f0 + '. Best guess for missing filename is ' +
+                cesmLE_fname(var, dt, guess_yr0, mem, **kwargs))
         f_yr0 = f_yrf + 1
 
     print('\n[OCR] Requested CESM LE files were successfully found in ' + f0)
@@ -239,7 +245,6 @@ def load_cesmLE(var, dt, yr0, yrf, mem, **kwargs):
                  for x in f_cesm]
     t0 = '{:04d}'.format(yr0) + '-01-01'
     tf = '{:04d}'.format(yrf) + '-12-31'
-    print(load_cesm[0].sel(time=slice(t0, tf)))
     if len(load_cesm) > 1:
         return xr.concat(load_cesm, 'time').sel(time=slice(t0, tf))
     else:

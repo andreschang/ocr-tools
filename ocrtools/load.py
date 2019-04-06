@@ -80,15 +80,11 @@ def noleap_2_datetime(data, **kwargs):
                 day = td[di]
                 if day.is_leap_year and day.dayofyear == 60:
                     td = td[0: di].append(td[di + 1:])
-                    # print('Removed')
-                    # print(day)
                     fixed = False
                 elif not day.is_leap_year and fixed is False:
                     td = td.insert(
                         di, pd.to_datetime(f4(day.year-1)+'-12-31'))
                     fixed = True
-                    # print('Added')
-                    # print(pd.to_datetime(f4(day.year)+'-12-31'))
 
     data.coords['time'] = td
     return(data)
