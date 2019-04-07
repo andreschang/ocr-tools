@@ -69,7 +69,7 @@ def gen_path(path_map, path_info, join='/', top='', **kwargs):
         join.join([path_info[i] for i in path_map if i in path_info.keys()]))
 
 
-def cesmLE_fname(var, dt, yr0, mem=0, hem=''):
+def cesmLE_fname(var, dt, yr0, mem=0, hem='', fullpath=False):
     """
     Generates cesmLE filename
     Args:
@@ -142,7 +142,12 @@ def cesmLE_fname(var, dt, yr0, mem=0, hem=''):
             elif dt == 'monthly':
                 cesm_d['type'] = 'h0'
 
-    return(gen_path(cesm_fname, cesm_d, '.'))
+    if fullpath:
+        raw_cesm = {'type': 'raw', 'src': 'cesm', 'dt': dt, 'var': var}
+        directory = gen_path(directory_map, raw_cesm, top=None)
+        return(gen_path(cesm_fname, cesm_d, '.', top=directory))
+    else:
+        return(gen_path(cesm_fname, cesm_d, '.'))
 
 
 def mkdir_p(path):
