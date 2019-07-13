@@ -36,7 +36,7 @@ def xr_load(path, average=False, standardize=True, **kwargs):
 
             if average:
                 deltas = np.roll(np.diff(t), 1)
-                td = np.append((t[:-1] - deltas/2), t[-1] - deltas[0]/2)
+                td = np.append((t[:-1] - deltas / 2), t[-1] - deltas[0] / 2)
 
             d.coords['time'] = td
     except KeyError:
@@ -50,7 +50,7 @@ def xr_load(path, average=False, standardize=True, **kwargs):
 
 def noleap_2_datetime(data, **kwargs):
 
-    dt0 = int(data.time[1]-data.time[0])
+    dt0 = int(data.time[1] - data.time[0])
     dt = 'daily' if dt0 < 2.3e15 else 'monthly'
     by, fby = get_groupings(dt)
     t = data['time']
@@ -59,23 +59,23 @@ def noleap_2_datetime(data, **kwargs):
         yr0, yrf = np.amin(t.to_index().year), np.amax(t.to_index().year)
     except TypeError:
         yr0, yrf = np.amin(t.to_index()).year, np.amax(t.to_index()).year
-    yrs = np.arange(yr0, yrf+1)
+    yrs = np.arange(yr0, yrf + 1)
 
     for yr in yrs:
         ti = t.sel(time=slice(f4(yr) + '-01-01', f4(yr) + '-12-31'))
         try:
             td = td.append(
-                pd.date_range(f4(yr)+'-01-01', freq=fby, periods=len(ti)))
+                pd.date_range(f4(yr) + '-01-01', freq=fby, periods=len(ti)))
         except NameError:
-            td = pd.date_range(f4(yr)+'-01-01', freq=fby, periods=len(ti))
+            td = pd.date_range(f4(yr) + '-01-01', freq=fby, periods=len(ti))
 
         fixed = True
 
     if dt == 'daily':
         for di in range(len(td)):
-            if td[di-1].is_leap_year and di == len(td):
+            if td[di - 1].is_leap_year and di == len(td):
                 td = td.insert(
-                        di, pd.to_datetime(f4(yrf)+'-12-31'))
+                    di, pd.to_datetime(f4(yrf) + '-12-31'))
             else:
                 day = td[di]
                 if day.is_leap_year and day.dayofyear == 60:
@@ -83,11 +83,19 @@ def noleap_2_datetime(data, **kwargs):
                     fixed = False
                 elif not day.is_leap_year and fixed is False:
                     td = td.insert(
-                        di, pd.to_datetime(f4(day.year-1)+'-12-31'))
+                        di, pd.to_datetime(f4(day.year - 1) + '-12-31'))
                     fixed = True
 
     data.coords['time'] = td
     return(data)
+
+
+def lon_convert(degrees_lon):
+    if degrees_lon < 0.:
+        deg_out = 360 + degrees_lon
+    else:
+        deg_out = degrees_lon
+    return(deg_out)
 
 
 def standardize_coords(dataset, center=True):
@@ -220,8 +228,10 @@ def subset(dataset, scope):
     scope_keys = [x for x in scope.__dict__.keys()]
 
     # First subset year range
-    t0 = scope.yr0+'-01-01' if scope.yr0 is not None else np.min(dataset['time'])
-    tf = scope.yrf+'-12-31' if scope.yrf is not None else np.max(dataset['time'])
+    t0 = scope.yr0 + \
+        '-01-01' if scope.yr0 is not None else np.min(dataset['time'])
+    tf = scope.yrf + \
+        '-12-31' if scope.yrf is not None else np.max(dataset['time'])
     d_subset = dataset.sel(time=slice(t0, tf))
 
     def box_subset(d_in, lat_min, lat_max, lon_min, lon_max):
@@ -280,7 +290,7 @@ class scope(object):
     be used added as attributes to the scope object
     """
 
-    def __init__(self, interactive=True, tk_select=True, prime_meridian=0,
+    def __init__(self, interactive=True, tk_select=True, lon_convert=False,
                  **kwargs):
 
         scopes = ['yr0', 'yrf', 'lat_min', 'lat_max', 'lon_min', 'lon_max',
@@ -342,7 +352,7 @@ class scope(object):
 
             # Convert lon values, if needed
             if 'lon' in ai:
-                setattr(self, ai, getattr(self, ai)+(180 - prime_meridian))
+                setattr(self, ai, lon_convert(getattr(self, ai)))
             if 'yr' in ai and getattr(self, ai) is not None:
                 setattr(self, ai, '{:04d}'.format(int(getattr(self, ai))))
 
