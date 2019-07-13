@@ -90,7 +90,7 @@ def noleap_2_datetime(data, **kwargs):
     return(data)
 
 
-def lon_convert(degrees_lon):
+def convert_lon(degrees_lon):
     if degrees_lon < 0.:
         deg_out = 360 + degrees_lon
     else:
@@ -352,7 +352,8 @@ class scope(object):
 
             # Convert lon values, if needed
             if 'lon' in ai:
-                setattr(self, ai, lon_convert(getattr(self, ai)))
+                if lon_convert:
+                    setattr(self, ai, convert_lon(getattr(self, ai)))
             if 'yr' in ai and getattr(self, ai) is not None:
                 setattr(self, ai, '{:04d}'.format(int(getattr(self, ai))))
 
