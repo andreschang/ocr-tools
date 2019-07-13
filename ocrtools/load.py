@@ -294,7 +294,7 @@ class scope(object):
                  **kwargs):
 
         scopes = ['yr0', 'yrf', 'lat_min', 'lat_max', 'lon_min', 'lon_max',
-                  'location']
+                  'location', 'lat', 'lon']
         none_vals = {'lat_min': -90, 'lat_max': 90, 'lon_min': -180,
                      'lon_max': 180, 'yr0': None, 'yrf': None}
 
@@ -308,9 +308,11 @@ class scope(object):
             scopes = scopes[0:2] + ['tk_selection']
         elif 'location' in kwargs:
             self.location = kwargs['location']
-            scopes = scopes[0:2] + [scopes[-1]]
+            scopes = scopes[0:2] + ['location']
+        elif 'lat' in kwargs and 'lon' in kwargs:
+            scopes = scopes[0:2] + scopes[-2:]
         else:
-            scopes = scopes[0:-1]
+            scopes = scopes[0:6]
 
         try:
             if(kwargs['z_min']):
@@ -334,7 +336,7 @@ class scope(object):
                 geolocator = Nominatim()
                 geo_loc = geolocator.geocode(self.location)
                 self.lat = geo_loc.latitude
-                self.lon = geo_loc.longitude + 180
+                self.lon = convert_lon(geo_loc.longitude)
             else:
                 try:
                     setattr(self, ai, kwargs[ai])
